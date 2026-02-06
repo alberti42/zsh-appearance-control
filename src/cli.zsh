@@ -21,8 +21,8 @@ function zac() {
 
     (status)
       # Print cached state only; does not query OS/tmux.
-      if (( ${+_zsh_appearance_control[state.is_dark]} )) && [[ -n ${_zsh_appearance_control[state.is_dark]} ]]; then
-        (( _zsh_appearance_control[state.is_dark] )) && print -r -- dark || print -r -- light
+      if (( ${+_zac[state.is_dark]} )) && [[ -n ${_zac[state.is_dark]} ]]; then
+        (( _zac[state.is_dark] )) && print -r -- dark || print -r -- light
       else
         print -r -- unknown
       fi
@@ -32,7 +32,7 @@ function zac() {
     (sync)
       # Force a sync from ground truth.
       _zac.debug.log "cli | sync"
-      _zsh_appearance_control[state.needs_sync]=1
+      _zac[state.needs_sync]=1
       _zac.sync
       return $?
     ;;
@@ -41,7 +41,7 @@ function zac() {
       # Get/set the callback function name.
       # The callback is called by _zac.propagate as: $callback <is_dark>.
       if (( $# == 0 )); then
-        local cb=${_zsh_appearance_control[cfg.callback_fnc]:-}
+        local cb=${_zac[cfg.callback_fnc]:-}
         if [[ -n $cb ]]; then
           print -r -- "$cb"
         else
@@ -52,11 +52,11 @@ function zac() {
 
       if [[ $1 == '-' ]]; then
         # Disable callback.
-        _zsh_appearance_control[cfg.callback_fnc]=''
+        _zac[cfg.callback_fnc]=''
         return 0
       fi
 
-      _zsh_appearance_control[cfg.callback_fnc]="$1"
+      _zac[cfg.callback_fnc]="$1"
       return 0
     ;;
 
@@ -67,7 +67,7 @@ function zac() {
 
       if [[ $cmd == toggle ]]; then
         # Toggle based on cached state only (avoid querying ground truth).
-        local cur=${_zsh_appearance_control[state.is_dark]:-0}
+        local cur=${_zac[state.is_dark]:-0}
         target=$(( cur ? 0 : 1 ))
       elif [[ $cmd == dark ]]; then
         target=1
@@ -81,10 +81,10 @@ function zac() {
       fi
 
       # Trust the transition; update cache and prompt immediately.
-      _zsh_appearance_control[state.is_dark]=$target
+      _zac[state.is_dark]=$target
       _zac.propagate
       # Do not schedule a sync here; external mechanism will send USR1.
-      _zsh_appearance_control[state.needs_sync]=0
+      _zac[state.needs_sync]=0
       return 0
     ;;
   esac
@@ -95,8 +95,8 @@ function zac() {
 
 function _zac.cli.init() {
   # CLI module init (idempotent).
-  (( ${+_zsh_appearance_control[guard.cli_inited]} )) && return 0
-  _zsh_appearance_control[guard.cli_inited]=1
+  (( ${+_zac[guard.cli_inited]} )) && return 0
+  _zac[guard.cli_inited]=1
 }
 
 _zac.cli.init

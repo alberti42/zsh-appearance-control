@@ -28,9 +28,9 @@
 # Prompt/plugin behavior only: do nothing in non-interactive shells.
 [[ -o interactive ]] || return 0
 
-typeset -gA _zsh_appearance_control
+typeset -gA _zac
 
-_zsh_appearance_control[meta.plugin_dir]=${${(%):-%x}:a:h}
+_zac[meta.plugin_dir]=${${(%):-%x}:a:h}
 
 ####################################################################
 # Bootstrap
@@ -52,7 +52,7 @@ function _zac.debug.log() { return 0 }
 # - Core defines module compilation/sourcing helpers.
 # - Core sources its hard dependencies.
 # - Core self-initializes by calling _zac.init once at EOF.
-builtin source "${_zsh_appearance_control[meta.plugin_dir]}/src/core.zsh"
+builtin source "${_zac[meta.plugin_dir]}/src/core.zsh"
 
 function zac() {
   # Lazy stub: source CLI (+ platform) and tail-call the real zac().

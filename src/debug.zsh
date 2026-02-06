@@ -25,11 +25,11 @@ function _zac.debug.init() {
   # Create (if needed) the shared FIFO.
   #
   # Side effects:
-  # - sets _zsh_appearance_control[debug.fifo] to FIFO path
-  # - sets _zsh_appearance_control[debug.start_ts] to the init timestamp
+  # - sets _zac[debug.fifo] to FIFO path
+  # - sets _zac[debug.start_ts] to the init timestamp
 
-  (( _zsh_appearance_control[cfg.debug_mode] )) || return 0
-  [[ -n ${_zsh_appearance_control[debug.fifo]:-} ]] && return 0
+  (( _zac[cfg.debug_mode] )) || return 0
+  [[ -n ${_zac[debug.fifo]:-} ]] && return 0
 
   local tmp=${TMPDIR:-/tmp}
   local user=${USER:-${LOGNAME:-unknown}}
@@ -44,10 +44,10 @@ function _zac.debug.init() {
     command mkfifo -m 600 -- "$fifo" 2>/dev/null || [[ -p $fifo ]] || return 1
   fi
 
-  _zsh_appearance_control[debug.fifo]=$fifo
+  _zac[debug.fifo]=$fifo
 
   _zac.debug.ts
-  _zsh_appearance_control[debug.start_ts]=$REPLY
+  _zac[debug.start_ts]=$REPLY
 
   # Best-effort: log an init marker if a reader is already attached.
   _zac.debug.log "zac debug init | fifo=${fifo}"
@@ -58,20 +58,20 @@ function _zac.debug.log() {
   #
   # Usage:
   #   _zac.debug.log "message"
-  (( _zsh_appearance_control[cfg.debug_mode] )) || return 0
+  (( _zac[cfg.debug_mode] )) || return 0
 
-  local fifo=${_zsh_appearance_control[debug.fifo]:-}
+  local fifo=${_zac[debug.fifo]:-}
   [[ -n $fifo ]] || return 0
 
-  local fd=${_zsh_appearance_control[debug.fd]:-}
+  local fd=${_zac[debug.fd]:-}
   if [[ -z $fd ]]; then
     # Open in non-blocking write mode. If nobody is reading, this fails.
     zmodload -F zsh/system b:sysopen 2>/dev/null || return 0
     sysopen -w -o nonblock -u fd -- "$fifo" 2>/dev/null || return 0
-    _zsh_appearance_control[debug.fd]=$fd
+    _zac[debug.fd]=$fd
 
     # Emit a start marker when the first writer successfully connects.
-    local start_ts=${_zsh_appearance_control[debug.start_ts]:-}
+    local start_ts=${_zac[debug.start_ts]:-}
     [[ -n $start_ts ]] && builtin print -r -- >&$fd "${start_ts} | zac debug start"
   fi
 
@@ -79,14 +79,14 @@ function _zac.debug.log() {
   { builtin print -r -- >&$fd "${REPLY} | $*" } 2>/dev/null || {
     # Broken pipe / reader went away.
     exec {fd}>&-
-    _zsh_appearance_control[debug.fd]=''
+    _zac[debug.fd]=''
   }
 }
 
 function zac.debug.follow() {
   # Follow the debug FIFO and print lines to the terminal.
   # This blocks; stop with Ctrl-C.
-  local fifo=${_zsh_appearance_control[debug.fifo]:-}
+  local fifo=${_zac[debug.fifo]:-}
   if [[ -z $fifo ]]; then
     print -r -- "zac.debug.follow: debug is not enabled (set ZAC_DEBUG=1 and re-source)" >&2
     return 1
@@ -107,8 +107,8 @@ function zac.debug.follow() {
 
 function _zac.debug.module_init() {
   # Debug module init (idempotent).
-  (( ${+_zsh_appearance_control[guard.debug_module_inited]} )) && return 0
-  _zsh_appearance_control[guard.debug_module_inited]=1
+  (( ${+_zac[guard.debug_module_inited]} )) && return 0
+  _zac[guard.debug_module_inited]=1
 
   _zac.debug.init
 }
