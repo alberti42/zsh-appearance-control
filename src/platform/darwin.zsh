@@ -1,4 +1,17 @@
+#!/usr/bin/env zsh
+
+# macOS implementation.
+#
+# Uses AppleScript via `osascript` to query/set System Events -> appearance
+# preferences -> dark mode.
+#
+# Notes:
+# - _zac.os_dark_mode.set runs asynchronously (background) to avoid blocking.
+# - REPLY is used as a conventional "return value" channel.
+
 function _zac.os_dark_mode.query() {
+  # Query OS dark mode.
+  # Sets REPLY to 1 (dark) or 0 (light).
   local v
 
   v=$(command osascript 2>/dev/null <<'OSA'
@@ -14,6 +27,15 @@ OSA
 }
 
 function _zac.os_dark_mode.set() {
+  # Request OS dark mode to be set.
+  #
+  # Arguments:
+  # - $1: 1 to enable dark mode, 0 to disable.
+  #
+  # Behavior:
+  # - Sets REPLY to the requested target (0/1).
+  # - Starts the osascript process in the background (&!) to avoid blocking.
+  # - Does not guarantee that the OS has finished switching when it returns.
   local target=$1
   local value tpl script
 

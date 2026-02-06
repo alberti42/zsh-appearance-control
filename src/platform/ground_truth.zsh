@@ -1,6 +1,12 @@
-# Queries the plugin's ground truth for dark mode.
-# If in tmux, @dark_appearance is authoritative.
+# Ground truth selection.
+#
+# This function is the single place that answers: "what is dark mode right now?"
+#
+# For now:
+# - If running inside tmux, tmux option @dark_appearance is authoritative.
+# - Outside tmux: TODO. We do NOT query the OS yet; we return the cached value.
 function _zac.dark_mode.query_ground_truth() {
+  # Sets REPLY to 1 (dark) or 0 (light).
   if [[ -n $TMUX ]]; then
     _zac.tmux_dark_mode.query
     return $?
