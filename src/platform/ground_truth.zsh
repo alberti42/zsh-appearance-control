@@ -16,6 +16,6 @@ function _zac.dark_mode.query_ground_truth() {
   # TODO: non-tmux ground truth (e.g. file-based state).
   # For now, fall back to the current cached value.
   _zac.debug.log "truth | non-tmux TODO (using cache)"
-  REPLY=${_zsh_appearance_control[is_dark]:-0}
+  REPLY=${_zsh_appearance_control[state.is_dark]:-0}
   return 0
 }

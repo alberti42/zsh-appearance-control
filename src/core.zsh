@@ -39,11 +39,11 @@ function _zac.module.compile_and_source() {
   # Compile (optional) and source a plugin module by workspace-relative path.
   local module=$1
 
-  local dir=${_zsh_appearance_control[plugin.dir]:-}
+  local dir=${_zsh_appearance_control[meta.plugin_dir]:-}
   if [[ -z $dir ]]; then
     local core_path=${${(%):-%x}:a}
     dir=${core_path:h:h}
-    _zsh_appearance_control[plugin.dir]=$dir
+    _zsh_appearance_control[meta.plugin_dir]=$dir
   fi
 
   local script="$dir/$module"
@@ -73,36 +73,36 @@ function _zac.init.config() {
   # This is the only place that reads ZAC_* env vars.
 
   # callback.fnc: optional function name called as: $callback <is_dark>
-  : ${_zsh_appearance_control[callback.fnc]:=''}
-  : ${_zsh_appearance_control[callback.fnc]:=${ZAC_CALLBACK_FNC:-''}}
+  : ${_zsh_appearance_control[cfg.callback_fnc]:=''}
+  : ${_zsh_appearance_control[cfg.callback_fnc]:=${ZAC_CALLBACK_FNC:-''}}
 
   # on_source.redraw_prompt: if sourced while already in ZLE, redraw prompt
-  : ${_zsh_appearance_control[on_source.redraw_prompt]:=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}}
+  : ${_zsh_appearance_control[cfg.on_source.redraw_prompt]:=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}}
 
   # on_change.redraw_prompt: if a sync runs in ZLE and is_dark changes, redraw
-  : ${_zsh_appearance_control[on_change.redraw_prompt]:=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}}
+  : ${_zsh_appearance_control[cfg.on_change.redraw_prompt]:=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}}
 
   # debug.mode: enable debug FIFO logging.
-  : ${_zsh_appearance_control[debug.mode]:=${ZAC_DEBUG:-0}}
+  : ${_zsh_appearance_control[cfg.debug_mode]:=${ZAC_DEBUG:-0}}
 }
 
 function _zac.init.state() {
   # Initialize internal state keys (do not read external ground truth here).
 
   # is_dark: cached boolean (0/1). May be empty until first sync or zac command.
-  : ${_zsh_appearance_control[is_dark]:=''}
+  : ${_zsh_appearance_control[state.is_dark]:=''}
 
   # needs_sync: 1 => hooks call _zac.sync at the next opportunity.
-  : ${_zsh_appearance_control[needs_sync]:=0}
+  : ${_zsh_appearance_control[state.needs_sync]:=0}
 
   # needs_init_propagate: 1 => propagate once after first prompt.
-  : ${_zsh_appearance_control[needs_init_propagate]:=0}
+  : ${_zsh_appearance_control[state.needs_init_propagate]:=0}
 
   # last_sync_changed: 1 if the last _zac.sync changed is_dark.
-  : ${_zsh_appearance_control[last_sync_changed]:=0}
+  : ${_zsh_appearance_control[state.last_sync_changed]:=0}
 
   # logon: while 1, _zac.propagate avoids touching other plugins.
-  : ${_zsh_appearance_control[logon]:=0}
+  : ${_zsh_appearance_control[state.logon]:=0}
 
   # debug.fifo: shared FIFO path used by the debug module.
   : ${_zsh_appearance_control[debug.fifo]:=''}
@@ -116,7 +116,7 @@ function _zac.init.state() {
 
 function _zac.init.debug() {
   # Load and initialize debug module if enabled.
-  (( _zsh_appearance_control[debug.mode] )) || return 0
+  (( _zsh_appearance_control[cfg.debug_mode] )) || return 0
 
   if (( $+functions[_zac.debug.init] == 0 )); then
     _zac.module.compile_and_source src/debug.zsh
@@ -127,23 +127,23 @@ function _zac.init.shell() {
   # Per-shell startup initialization.
   #
   # Must not query external state.
-  (( ${+_zsh_appearance_control[_shell_inited]} )) && return 0
-  _zsh_appearance_control[_shell_inited]=1
+  (( ${+_zsh_appearance_control[guard.shell_inited]} )) && return 0
+  _zsh_appearance_control[guard.shell_inited]=1
 
   local in_zle=0
   [[ -n ${ZLE_STATE-} ]] && in_zle=1
 
   # Do not force a sync on init. Sync should be triggered explicitly (USR1 or
   # `zac sync`) to avoid prompt stalls.
-  _zsh_appearance_control[needs_init_propagate]=0
-  _zsh_appearance_control[last_sync_changed]=0
+  _zsh_appearance_control[state.needs_init_propagate]=0
+  _zsh_appearance_control[state.last_sync_changed]=0
 
   if (( in_zle )); then
     # If sourced while editing a command line, allow propagation immediately.
-    _zsh_appearance_control[logon]=0
+    _zsh_appearance_control[state.logon]=0
   else
     # During shell startup, keep logon=1 until the first prompt.
-    _zsh_appearance_control[logon]=1
+    _zsh_appearance_control[state.logon]=1
   fi
 }
 
@@ -158,8 +158,8 @@ function _zac.init() {
   #
   # Non-responsibilities:
   # - No external queries (tmux/OS) and no sync.
-  (( ${+_zsh_appearance_control[_inited]} )) && return 0
-  _zsh_appearance_control[_inited]=1
+  (( ${+_zsh_appearance_control[guard.core_inited]} )) && return 0
+  _zsh_appearance_control[guard.core_inited]=1
 
   _zac.init.config
   _zac.init.state
@@ -180,10 +180,10 @@ function _zac.init() {
 
   # Signal handler: keep it cheap. Do not run tmux/osascript here.
   TRAPUSR1() {
-    _zsh_appearance_control[needs_sync]=1
+    _zsh_appearance_control[state.needs_sync]=1
   }
 
-  if [[ -n ${ZLE_STATE-} ]] && (( _zsh_appearance_control[on_source.redraw_prompt] )); then
+  if [[ -n ${ZLE_STATE-} ]] && (( _zsh_appearance_control[cfg.on_source.redraw_prompt] )); then
     _zac.debug.log "init | redraw on source"
     _zac.propagate
     zle reset-prompt 2>/dev/null
@@ -192,19 +192,19 @@ function _zac.init() {
   _zac.debug.log "init | done"
 }
 
-# Propagate from _zsh_appearance_control[is_dark] -> plugin vars.
+# Propagate from _zsh_appearance_control[state.is_dark] -> plugin vars.
 function _zac.propagate() {
   # Apply cached state to prompt-related variables.
   #
   # This function must be fast and side-effect-safe because it can be called
   # from hooks. It does not query tmux/OS.
-  (( _zsh_appearance_control[logon] )) && return
+  (( _zsh_appearance_control[state.logon] )) && return
 
-  _zac.debug.log "core | propagate | is_dark=${_zsh_appearance_control[is_dark]:-}"
+  _zac.debug.log "core | propagate | is_dark=${_zsh_appearance_control[state.is_dark]:-}"
 
-  local cb=${_zsh_appearance_control[callback.fnc]}
+  local cb=${_zsh_appearance_control[cfg.callback_fnc]}
   if [[ -n $cb && $+functions[$cb] -eq 1 ]]; then
-    local is_dark=${_zsh_appearance_control[is_dark]:-0}
+    local is_dark=${_zsh_appearance_control[state.is_dark]:-0}
     
     $cb $is_dark
   fi
@@ -223,19 +223,19 @@ function _zac.sync() {
 
   _zac.debug.log "core | sync | ground_truth=${is_dark}"
 
-  old_mode=${_zsh_appearance_control[is_dark]}
+  old_mode=${_zsh_appearance_control[state.is_dark]}
   if [[ $old_mode != $is_dark ]]; then
-    _zsh_appearance_control[is_dark]=$is_dark
+    _zsh_appearance_control[state.is_dark]=$is_dark
     changed=1
     _zac.propagate
   fi
 
   _zac.debug.log "core | sync | changed=${changed}"
 
-  _zsh_appearance_control[last_sync_changed]=$changed
-  _zsh_appearance_control[needs_sync]=0
+  _zsh_appearance_control[state.last_sync_changed]=$changed
+  _zsh_appearance_control[state.needs_sync]=0
 
-  if (( changed )) && (( _zsh_appearance_control[on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
+  if (( changed )) && (( _zsh_appearance_control[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
     # Only meaningful if a sync happens while ZLE is active.
     zle reset-prompt 2>/dev/null
   fi
@@ -245,20 +245,20 @@ function _zac.precmd() {
   # precmd hook: runs right before the prompt is shown.
   # Used to perform deferred sync work and to perform one-time post-logon
   # propagation.
-  if (( _zsh_appearance_control[logon] )); then
+  if (( _zsh_appearance_control[state.logon] )); then
     _zac.debug.log "core | precmd | first prompt"
-    _zsh_appearance_control[logon]=0
-    _zsh_appearance_control[needs_init_propagate]=1
+    _zsh_appearance_control[state.logon]=0
+    _zsh_appearance_control[state.needs_init_propagate]=1
   fi
 
-  if (( _zsh_appearance_control[needs_sync] )); then
+  if (( _zsh_appearance_control[state.needs_sync] )); then
     _zac.debug.log "core | precmd | needs_sync=1"
     _zac.sync
   fi
 
-  if (( _zsh_appearance_control[needs_init_propagate] )); then
-    _zsh_appearance_control[needs_init_propagate]=0
-    if (( ! _zsh_appearance_control[last_sync_changed] )); then
+  if (( _zsh_appearance_control[state.needs_init_propagate] )); then
+    _zsh_appearance_control[state.needs_init_propagate]=0
+    if (( ! _zsh_appearance_control[state.last_sync_changed] )); then
       # Ensure prompt-dependent vars are initialized even if the first sync did
       # not change the cached value.
       _zac.propagate
@@ -270,7 +270,7 @@ function _zac.preexec() {
   # preexec hook: runs after Enter, right before executing the command.
   # This helps keep state correct even if a signal arrived while the user was
   # sitting at a prompt (no precmd ran yet).
-  if (( _zsh_appearance_control[needs_sync] )); then
+  if (( _zsh_appearance_control[state.needs_sync] )); then
     _zac.debug.log "core | preexec | needs_sync=1"
     _zac.sync
   fi

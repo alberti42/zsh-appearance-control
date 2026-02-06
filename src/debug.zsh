@@ -28,7 +28,7 @@ function _zac.debug.init() {
   # - sets _zsh_appearance_control[debug.fifo] to FIFO path
   # - sets _zsh_appearance_control[debug.start_ts] to the init timestamp
 
-  (( _zsh_appearance_control[debug.mode] )) || return 0
+  (( _zsh_appearance_control[cfg.debug_mode] )) || return 0
   [[ -n ${_zsh_appearance_control[debug.fifo]:-} ]] && return 0
 
   local tmp=${TMPDIR:-/tmp}
@@ -58,7 +58,7 @@ function _zac.debug.log() {
   #
   # Usage:
   #   _zac.debug.log "message"
-  (( _zsh_appearance_control[debug.mode] )) || return 0
+  (( _zsh_appearance_control[cfg.debug_mode] )) || return 0
 
   local fifo=${_zsh_appearance_control[debug.fifo]:-}
   [[ -n $fifo ]] || return 0
@@ -107,8 +107,8 @@ function zac.debug.follow() {
 
 function _zac.debug.module_init() {
   # Debug module init (idempotent).
-  (( ${+_zsh_appearance_control[_debug_module_inited]} )) && return 0
-  _zsh_appearance_control[_debug_module_inited]=1
+  (( ${+_zsh_appearance_control[guard.debug_module_inited]} )) && return 0
+  _zsh_appearance_control[guard.debug_module_inited]=1
 
   _zac.debug.init
 }
