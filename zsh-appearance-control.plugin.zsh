@@ -4,6 +4,9 @@
 #  zsh-appearance-control (c) 2026 Andrea Alberti
 ###################################################
 
+# Prompt/plugin behavior only: do nothing in non-interactive shells.
+[[ -o interactive ]] || return 0
+
 # Create an associative array to organize the variables of this zsh plugin
 typeset -gA _zsh_appearance_control
 _zsh_appearance_control[callback.fnc]=''
@@ -76,66 +79,63 @@ function _zac.sync() {
   _zsh_appearance_control[needs_sync]=0
 }
 
-# Only in interactive shells
-if [[ -o interactive ]]; then
-  local _zac_in_zle=0
-  [[ -n ${ZLE_STATE-} ]] && _zac_in_zle=1
+local _zac_in_zle=0
+[[ -n ${ZLE_STATE-} ]] && _zac_in_zle=1
 
-  # Set shell variables for internal appearance state management
-  _zsh_appearance_control[needs_sync]=1
-  _zsh_appearance_control[needs_init_propagate]=0
-  _zsh_appearance_control[last_sync_changed]=0
-  if (( _zac_in_zle )); then
+# Set shell variables for internal appearance state management
+_zsh_appearance_control[needs_sync]=1
+_zsh_appearance_control[needs_init_propagate]=0
+_zsh_appearance_control[last_sync_changed]=0
+if (( _zac_in_zle )); then
+  _zsh_appearance_control[logon]=0
+else
+  _zsh_appearance_control[logon]=1
+fi
+
+# Run one sync early (initializes cache), but don't fight plugin init yet
+_zac.sync
+
+if (( _zac_in_zle )) && (( _zsh_appearance_control[on_source.redraw_prompt] )); then
+  # If sourced while already at a prompt, ensure prompt-dependent vars are
+  # applied immediately and redraw without waiting for Enter.
+  if (( ! _zsh_appearance_control[last_sync_changed] )); then
+    _zac.propagate
+  fi
+  zle reset-prompt 2>/dev/null
+fi
+
+_zac.precmd() {
+  # First prompt: allow plugins to finish init, then propagate once.
+  if (( _zsh_appearance_control[logon] )); then
     _zsh_appearance_control[logon]=0
-  else
-    _zsh_appearance_control[logon]=1
+    _zsh_appearance_control[needs_sync]=1
+    _zsh_appearance_control[needs_init_propagate]=1
   fi
 
-  # Run one sync early (initializes cache), but don't fight plugin init yet
-  _zac.sync
+  if (( _zsh_appearance_control[needs_sync] )); then
+    _zac.sync
+  fi
 
-  if (( _zac_in_zle )) && (( _zsh_appearance_control[on_source.redraw_prompt] )); then
-    # If sourced while already at a prompt, ensure prompt-dependent vars are
-    # applied immediately and redraw without waiting for Enter.
+  if (( _zsh_appearance_control[needs_init_propagate] )); then
+    _zsh_appearance_control[needs_init_propagate]=0
     if (( ! _zsh_appearance_control[last_sync_changed] )); then
       _zac.propagate
     fi
-    zle reset-prompt 2>/dev/null
   fi
-  
-  _zac.precmd() {
-    # First prompt: allow plugins to finish init, then propagate once.
-    if (( _zsh_appearance_control[logon] )); then
-      _zsh_appearance_control[logon]=0
-      _zsh_appearance_control[needs_sync]=1
-      _zsh_appearance_control[needs_init_propagate]=1
-    fi
+}
 
-    if (( _zsh_appearance_control[needs_sync] )); then
-      _zac.sync
-    fi
+if (( ${precmd_functions[(I)_zac.precmd]} == 0 )); then
+  precmd_functions+=(_zac.precmd)
+fi
 
-    if (( _zsh_appearance_control[needs_init_propagate] )); then
-      _zsh_appearance_control[needs_init_propagate]=0
-      if (( ! _zsh_appearance_control[last_sync_changed] )); then
-        _zac.propagate
-      fi
-    fi
-  }
-
-  if (( ${precmd_functions[(I)_zac.precmd]} == 0 )); then
-    precmd_functions+=(_zac.precmd)
+_zac.preexec() {
+  if (( _zsh_appearance_control[needs_sync] )); then
+    _zac.sync
   fi
+}
 
-  _zac.preexec() {
-    if (( _zsh_appearance_control[needs_sync] )); then
-      _zac.sync
-    fi
-  }
-
-  if (( ${preexec_functions[(I)_zac.preexec]} == 0 )); then
-    preexec_functions+=(_zac.preexec)
-  fi
+if (( ${preexec_functions[(I)_zac.preexec]} == 0 )); then
+  preexec_functions+=(_zac.preexec)
 fi
 
 # Signal handler: avoid running tmux/ps/subprocess here. Just mark needs_sync.
