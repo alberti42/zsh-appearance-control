@@ -49,16 +49,12 @@ function zac() {
       local target
 
       if [[ $cmd == toggle ]]; then
-        _zac.dark_mode.query_ground_truth
-        target=$(( REPLY ? 0 : 1 ))
+        local cur=${_zsh_appearance_control[is_dark]:-0}
+        target=$(( cur ? 0 : 1 ))
       elif [[ $cmd == dark ]]; then
         target=1
       else
         target=0
-      fi
-
-      if [[ -n $TMUX ]]; then
-        _zac.tmux_dark_mode.set $target
       fi
 
       if ! _zac.os_dark_mode.set $target; then
@@ -66,8 +62,10 @@ function zac() {
         return 1
       fi
 
-      _zsh_appearance_control[needs_sync]=1
-      _zac.sync
+      # Trust the transition; update cache and prompt immediately.
+      _zsh_appearance_control[is_dark]=$target
+      _zac.propagate
+      _zsh_appearance_control[needs_sync]=0
       return 0
     ;;
   esac

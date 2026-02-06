@@ -17,6 +17,8 @@ function _zac.os_dark_mode.set() {
   local target=$1
   local value tpl script
 
+  REPLY=$target
+
   (( target )) && value=true || value=false
 
   tpl=$(command cat <<'OSA'
@@ -30,5 +32,6 @@ OSA
 
   builtin printf -v script -- "$tpl" "$value"
 
-  command osascript >/dev/null 2>&1 <<<"$script"
+  # Run in background to avoid blocking prompt during appearance switch.
+  command osascript >/dev/null 2>&1 <<<"$script" &!
 }

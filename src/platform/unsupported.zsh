@@ -4,5 +4,6 @@ function _zac.os_dark_mode.query() {
 }
 
 function _zac.os_dark_mode.set() {
+  REPLY=''
   return 1
 }
