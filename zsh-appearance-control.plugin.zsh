@@ -55,18 +55,17 @@ function _zac.debug.log() { return 0 }
 builtin source "${_zsh_appearance_control[plugin.dir]}/src/core.zsh"
 
 function zac() {
-  # Lazy stub: source CLI (+ platform) on first use.
-  (( ${+_zsh_appearance_control[_cli_loaded]} )) || _zsh_appearance_control[_cli_loaded]=0
-  if (( ! _zsh_appearance_control[_cli_loaded] )); then
-    _zsh_appearance_control[_cli_loaded]=1
+  # Lazy stub: source CLI (+ platform) and tail-call the real zac().
+  #
+  # Note: we intentionally do NOT guard this with a "loaded" flag.
+  # The intended pattern is: sourcing src/cli.zsh overwrites this stub.
 
-    case $OSTYPE in
-      (darwin*) _zac.module.compile_and_source src/platform/darwin.zsh ;;
-      (*)       _zac.module.compile_and_source src/platform/unsupported.zsh ;;
-    esac
+  case $OSTYPE in
+    (darwin*) _zac.module.compile_and_source src/platform/darwin.zsh || return $? ;;
+    (*)       _zac.module.compile_and_source src/platform/unsupported.zsh || return $? ;;
+  esac
 
-    _zac.module.compile_and_source src/cli.zsh
-  fi
+  _zac.module.compile_and_source src/cli.zsh || return $?
 
   zac "$@"
 }

@@ -31,7 +31,9 @@ function _zac.module.compile() {
 
   local compiled_script="${script}.zwc"
   if [[ ! -f $compiled_script || $script -nt $compiled_script ]]; then
-    zcompile -Uz -- "$script" "$compiled_script" 2>/dev/null || true
+    if ! zcompile -Uz -- "$script" "$compiled_script" 2>/dev/null; then
+      print -r -- "zac: warning: failed to compile: $script" >&2
+    fi
   fi
 }
 
@@ -47,8 +49,18 @@ function _zac.module.compile_and_source() {
   fi
 
   local script="$dir/$module"
+
+  if [[ ! -f $script ]]; then
+    print -r -- "zac: error: missing module: $script" >&2
+    return 1
+  fi
+
   _zac.module.compile "$script"
-  builtin source "$script"
+
+  if ! builtin source "$script"; then
+    print -r -- "zac: error: failed to source: $script" >&2
+    return 1
+  fi
 }
 
 # Compile this core module for subsequent shells.
