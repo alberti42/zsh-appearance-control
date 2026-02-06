@@ -6,7 +6,7 @@ function zac() {
 
   case $cmd in
     (-h|--help|help)
-      print -r -- "usage: zac <status|sync|toggle|dark|light>"
+      print -r -- "usage: zac <status|sync|toggle|dark|light|callback>"
       return 0
     ;;
 
@@ -23,6 +23,26 @@ function zac() {
       _zsh_appearance_control[needs_sync]=1
       _zac.sync
       return $?
+    ;;
+
+    (callback)
+      if (( $# == 0 )); then
+        local cb=${_zsh_appearance_control[callback.fnc]:-}
+        if [[ -n $cb ]]; then
+          print -r -- "$cb"
+        else
+          print -r -- "--no callback function set--"
+        fi
+        return 0
+      fi
+
+      if [[ $1 == '-' ]]; then
+        _zsh_appearance_control[callback.fnc]=''
+        return 0
+      fi
+
+      _zsh_appearance_control[callback.fnc]="$1"
+      return 0
     ;;
 
     (toggle|dark|light)

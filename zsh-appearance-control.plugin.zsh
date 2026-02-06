@@ -12,6 +12,7 @@ typeset -gA _zsh_appearance_control
 _zsh_appearance_control[dir]=${${(%):-%x}:a:h}
 
 : ${_zsh_appearance_control[callback.fnc]:=''}
+: ${_zsh_appearance_control[callback.fnc]:=${ZAC_CALLBACK_FNC:-''}}
 : ${_zsh_appearance_control[is_dark]:=''}
 : ${_zsh_appearance_control[needs_sync]:=1}
 : ${_zsh_appearance_control[needs_init_propagate]:=0}

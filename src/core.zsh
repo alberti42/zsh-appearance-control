@@ -22,18 +22,10 @@ function _zac.init() {
 function _zac.propagate() {
   (( _zsh_appearance_control[logon] )) && return
 
-  local is_dark=${_zsh_appearance_control[is_dark]:-0}
-
-  if [[ ${(t)_zsh_opencode_tab} == association* ]]; then
-    if (( is_dark )); then
-      _zsh_opencode_tab[spinner.bg_hex]="#000000"
-    else
-      _zsh_opencode_tab[spinner.bg_hex]="#FFFFFF"
-    fi
-  fi
-
   local cb=${_zsh_appearance_control[callback.fnc]}
   if [[ -n $cb && $+functions[$cb] -eq 1 ]]; then
+    local is_dark=${_zsh_appearance_control[is_dark]:-0}
+    
     $cb $is_dark
   fi
 }
