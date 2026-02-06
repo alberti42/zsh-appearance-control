@@ -40,8 +40,7 @@ _zsh_appearance_control[plugin.dir]=${${(%):-%x}:a:h}
 # - ensure we are interactive
 # - establish the global state map
 # - find the plugin directory
-# - compile/source core modules
-# - call the single core entrypoint: _zac.init
+# - source the core module (which compiles/sources its deps and self-inits)
 #+#+#+#+############################################################
 
 # Bootstrap-time no-op logger.
@@ -49,30 +48,11 @@ _zsh_appearance_control[plugin.dir]=${${(%):-%x}:a:h}
 # The debug module overwrites _zac.debug.log when ZAC_DEBUG=1.
 function _zac.debug.log() { return 0 }
 
-function _zac.module.source() {
-  # Source a module from src/ with optional compilation.
-  local module=$1
-  local dir=${_zsh_appearance_control[plugin.dir]}
-  local compile=${ZAC_COMPILE:-1}
-
-  local script="$dir/$module"
-  local compiled_script="${script}.zwc"
-
-  if (( compile )); then
-    if [[ ! -f $compiled_script || $script -nt $compiled_script ]]; then
-      zcompile -Uz -- "$script" "$compiled_script" 2>/dev/null
-    fi
-  fi
-
-  builtin source "$script"
-}
-
-# Eager-load core runtime needed for hooks and USR1-driven sync.
-_zac.module.source src/platform/tmux.zsh
-_zac.module.source src/platform/ground_truth.zsh
-_zac.module.source src/core.zsh
-
-(( $+functions[_zac.init] )) && _zac.init
+# Load core.
+# - Core defines module compilation/sourcing helpers.
+# - Core sources its hard dependencies.
+# - Core self-initializes by calling _zac.init once at EOF.
+builtin source "${_zsh_appearance_control[plugin.dir]}/src/core.zsh"
 
 function zac() {
   # Lazy stub: source CLI (+ platform) on first use.
@@ -81,11 +61,11 @@ function zac() {
     _zsh_appearance_control[_cli_loaded]=1
 
     case $OSTYPE in
-      (darwin*) _zac.module.source src/platform/darwin.zsh ;;
-      (*)       _zac.module.source src/platform/unsupported.zsh ;;
+      (darwin*) _zac.module.compile_and_source src/platform/darwin.zsh ;;
+      (*)       _zac.module.compile_and_source src/platform/unsupported.zsh ;;
     esac
 
-    _zac.module.source src/cli.zsh
+    _zac.module.compile_and_source src/cli.zsh
   fi
 
   zac "$@"
