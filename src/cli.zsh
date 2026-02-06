@@ -92,3 +92,11 @@ function zac() {
   print -r -- "zac: unknown command: $cmd" >&2
   return 2
 }
+
+function _zac.cli.init() {
+  # CLI module init (idempotent).
+  (( ${+_zsh_appearance_control[_cli_inited]} )) && return 0
+  _zsh_appearance_control[_cli_inited]=1
+}
+
+_zac.cli.init

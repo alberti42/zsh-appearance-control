@@ -48,8 +48,6 @@ function _zac.init.debug() {
   if (( $+functions[_zac.debug.init] == 0 )); then
     (( $+functions[_zac.module.source] )) && _zac.module.source src/debug.zsh
   fi
-
-  (( $+functions[_zac.debug.init] )) && _zac.debug.init
 }
 
 function _zac.init.shell() {

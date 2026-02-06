@@ -73,21 +73,19 @@ _zac.module.source src/core.zsh
 
 (( $+functions[_zac.init] )) && _zac.init
 
-function _zac.cli.load() {
-  # Lazy-load the `zac` CLI and OS setters (used only when the user calls zac).
-  (( ${+_zsh_appearance_control[_cli_loaded]} )) && return 0
-  _zsh_appearance_control[_cli_loaded]=1
-
-  case $OSTYPE in
-    (darwin*) _zac.module.source src/platform/darwin.zsh ;;
-    (*)       _zac.module.source src/platform/unsupported.zsh ;;
-  esac
-
-  _zac.module.source src/cli.zsh
-}
-
 function zac() {
-  # Stub: load CLI implementation and tail-call the real zac().
-  _zac.cli.load || return $?
+  # Lazy stub: source CLI (+ platform) on first use.
+  (( ${+_zsh_appearance_control[_cli_loaded]} )) || _zsh_appearance_control[_cli_loaded]=0
+  if (( ! _zsh_appearance_control[_cli_loaded] )); then
+    _zsh_appearance_control[_cli_loaded]=1
+
+    case $OSTYPE in
+      (darwin*) _zac.module.source src/platform/darwin.zsh ;;
+      (*)       _zac.module.source src/platform/unsupported.zsh ;;
+    esac
+
+    _zac.module.source src/cli.zsh
+  fi
+
   zac "$@"
 }

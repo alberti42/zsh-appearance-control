@@ -104,3 +104,13 @@ function zac.debug.follow() {
     print -r -- "$line"
   done <"$fifo"
 }
+
+function _zac.debug.module_init() {
+  # Debug module init (idempotent).
+  (( ${+_zsh_appearance_control[_debug_module_inited]} )) && return 0
+  _zsh_appearance_control[_debug_module_inited]=1
+
+  _zac.debug.init
+}
+
+_zac.debug.module_init
