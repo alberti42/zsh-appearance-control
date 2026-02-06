@@ -20,9 +20,8 @@ function __my_appearance_propagate() {
   fi
 }
 
-function __my_appearance_apply() {
-  local dark_mode
-
+# This function returns the OS appearance as the ground truth
+function _get_OS_apperance() {
   # If in TMUX, we use @dark_appearance as the ground truth
   if [[ -n $TMUX ]]; then
     # Read tmux option (0/1). If unset, default to 0.
@@ -30,12 +29,32 @@ function __my_appearance_apply() {
     : ${dark_mode:=0}
   else
     # Fallback outside tmux (use env if present, else default 0)
-    dark_mode=${DARK_APPEARANCE:-0}
+    # We need to source it from some local file like in $XDG_CACHE_HOME/something
   fi
 
-  # Only update env if highlighting changed
+  # Normalize to 0/1 (tmux options may be set as on/true/yes).
+  case $dark_mode in
+    (1|on|true|yes) dark_mode=1 ;;
+    (*)             dark_mode=0 ;;
+  esac
+
+  REPLY=$dark_mode
+}
+
+function __my_appearance_apply() {
+  local dark_mode
+
+  _get_OS_apperance
+  dark_mode=$REPLY
+
+  # Only update env if changed
   if [[ ${DARK_APPEARANCE:-} != $dark_mode ]]; then
     export DARK_APPEARANCE=$dark_mode
+  fi
+
+  # Propagate when dirty (USR1 or first prompt) and past logon,
+  # even if DARK_APPEARANCE didn't change.
+  if (( _APPEARANCE_DIRTY )) && (( ! _APPEARANCE_LOGON )); then
     __my_appearance_propagate
   fi
 
