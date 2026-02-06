@@ -12,6 +12,7 @@ _zsh_appearance_control[needs_sync]=1
 _zsh_appearance_control[needs_init_propagate]=0
 _zsh_appearance_control[last_sync_changed]=0
 _zsh_appearance_control[logon]=0
+_zsh_appearance_control[on_source.redraw_prompt]=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}
 
 # propagate from _zsh_appearance_control[dark_mode] -> plugin vars
 function _zac.propagate() {
@@ -77,14 +78,30 @@ function _zac.sync() {
 
 # Only in interactive shells
 if [[ -o interactive ]]; then
+  local _zac_in_zle=0
+  [[ -n ${ZLE_STATE-} ]] && _zac_in_zle=1
+
   # Set shell variables for internal appearance state management
   _zsh_appearance_control[needs_sync]=1
   _zsh_appearance_control[needs_init_propagate]=0
   _zsh_appearance_control[last_sync_changed]=0
-  _zsh_appearance_control[logon]=1
+  if (( _zac_in_zle )); then
+    _zsh_appearance_control[logon]=0
+  else
+    _zsh_appearance_control[logon]=1
+  fi
 
   # Run one sync early (initializes cache), but don't fight plugin init yet
   _zac.sync
+
+  if (( _zac_in_zle )) && (( _zsh_appearance_control[on_source.redraw_prompt] )); then
+    # If sourced while already at a prompt, ensure prompt-dependent vars are
+    # applied immediately and redraw without waiting for Enter.
+    if (( ! _zsh_appearance_control[last_sync_changed] )); then
+      _zac.propagate
+    fi
+    zle reset-prompt 2>/dev/null
+  fi
   
   _zac.precmd() {
     # First prompt: allow plugins to finish init, then propagate once.
