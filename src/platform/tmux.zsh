@@ -11,6 +11,8 @@ function _zac.tmux_dark_mode.query() {
   # Sets REPLY to 1 (dark) or 0 (light).
   [[ -n $TMUX ]] || return 1
 
+  _zac.debug.log "tmux | query @dark_appearance"
+
   local v
   read -r v < <(command tmux show-options -gvq @dark_appearance 2>/dev/null)
   : ${v:=0}
@@ -19,6 +21,8 @@ function _zac.tmux_dark_mode.query() {
     (1|on|true|yes) REPLY=1 ;;
     (*)             REPLY=0 ;;
   esac
+
+  _zac.debug.log "tmux | @dark_appearance=${REPLY}"
 }
 
 function _zac.tmux_dark_mode.set() {

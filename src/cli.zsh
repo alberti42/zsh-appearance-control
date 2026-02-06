@@ -9,6 +9,7 @@
 
 function zac() {
   # CLI dispatcher.
+  _zac.debug.log "cli | zac $*"
   local cmd=${1:-status}
   shift $(( $# > 0 ? 1 : 0 ))
 
@@ -30,6 +31,7 @@ function zac() {
 
     (sync)
       # Force a sync from ground truth.
+      _zac.debug.log "cli | sync"
       _zsh_appearance_control[needs_sync]=1
       _zac.sync
       return $?
@@ -60,6 +62,7 @@ function zac() {
 
     (toggle|dark|light)
       # Set dark mode via OS integration and update cached state optimistically.
+      _zac.debug.log "cli | set $cmd"
       local target
 
       if [[ $cmd == toggle ]]; then

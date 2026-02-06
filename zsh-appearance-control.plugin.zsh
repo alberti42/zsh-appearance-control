@@ -43,6 +43,16 @@ _zsh_appearance_control[plugin.dir]=${${(%):-%x}:a:h}
 # - on_change.redraw_prompt: if a sync runs in ZLE and is_dark changes, redraw
 : ${_zsh_appearance_control[on_change.redraw_prompt]:=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}}
 
+# Debug (opt-in)
+:
+: ${_zsh_appearance_control[debug.mode]:=${ZAC_DEBUG:-0}}
+: ${_zsh_appearance_control[debug.fifo]:=''}
+: ${_zsh_appearance_control[debug.fd]:=''}
+: ${_zsh_appearance_control[debug.start_ts]:=''}
+
+# Provide a safe no-op logger. The debug module overwrites this when enabled.
+function _zac.debug.log() { return 0 }
+
 # Internal State Variables
 #
 # - is_dark: cached boolean 0/1 (may be empty until first sync or user command)
@@ -75,11 +85,21 @@ function _zac._source_module() {
 }
 
 # Eager-load core runtime needed for hooks and USR1-driven sync.
+if (( _zsh_appearance_control[debug.mode] )); then
+  _zac._source_module src/debug.zsh
+  (( $+functions[_zac.debug.init] )) && _zac.debug.init
+  _zac.debug.log "eager load | debug enabled"
+fi
+
 _zac._source_module src/platform/tmux.zsh
 _zac._source_module src/platform/ground_truth.zsh
 _zac._source_module src/core.zsh
 
+_zac.debug.log "eager load | core loaded"
+
 (( $+functions[_zac.init] )) && _zac.init
+
+_zac.debug.log "eager load | init complete"
 
 function _zac._load_cli() {
   # Lazy-load the `zac` CLI and OS setters (used only when the user calls zac).

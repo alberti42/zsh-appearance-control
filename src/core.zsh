@@ -19,6 +19,7 @@ function _zac.init() {
   #
   # Note: we intentionally do not query external state here.
   (( ${+_zsh_appearance_control[_inited]} )) && return 0
+  _zac.debug.log "core | init"
   _zsh_appearance_control[_inited]=1
 
   local in_zle=0
@@ -46,6 +47,8 @@ function _zac.propagate() {
   # from hooks. It does not query tmux/OS.
   (( _zsh_appearance_control[logon] )) && return
 
+  _zac.debug.log "core | propagate | is_dark=${_zsh_appearance_control[is_dark]:-}"
+
   local cb=${_zsh_appearance_control[callback.fnc]}
   if [[ -n $cb && $+functions[$cb] -eq 1 ]]; then
     local is_dark=${_zsh_appearance_control[is_dark]:-0}
@@ -61,8 +64,11 @@ function _zac.sync() {
   # If the value changes, we update the cache and call _zac.propagate.
   local is_dark old_mode changed=0
 
+  _zac.debug.log "core | sync | start"
   _zac.dark_mode.query_ground_truth
   is_dark=$REPLY
+
+  _zac.debug.log "core | sync | ground_truth=${is_dark}"
 
   old_mode=${_zsh_appearance_control[is_dark]}
   if [[ $old_mode != $is_dark ]]; then
@@ -70,6 +76,8 @@ function _zac.sync() {
     changed=1
     _zac.propagate
   fi
+
+  _zac.debug.log "core | sync | changed=${changed}"
 
   _zsh_appearance_control[last_sync_changed]=$changed
   _zsh_appearance_control[needs_sync]=0
@@ -85,11 +93,13 @@ function _zac.precmd() {
   # Used to perform deferred sync work and to perform one-time post-logon
   # propagation.
   if (( _zsh_appearance_control[logon] )); then
+    _zac.debug.log "core | precmd | first prompt"
     _zsh_appearance_control[logon]=0
     _zsh_appearance_control[needs_init_propagate]=1
   fi
 
   if (( _zsh_appearance_control[needs_sync] )); then
+    _zac.debug.log "core | precmd | needs_sync=1"
     _zac.sync
   fi
 
@@ -108,6 +118,7 @@ function _zac.preexec() {
   # This helps keep state correct even if a signal arrived while the user was
   # sitting at a prompt (no precmd ran yet).
   if (( _zsh_appearance_control[needs_sync] )); then
+    _zac.debug.log "core | preexec | needs_sync=1"
     _zac.sync
   fi
 }
