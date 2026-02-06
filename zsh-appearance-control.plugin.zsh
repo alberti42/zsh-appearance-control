@@ -14,7 +14,7 @@ _zsh_appearance_control[last_sync_changed]=0
 _zsh_appearance_control[logon]=0
 
 # propagate from _zsh_appearance_control[dark_mode] -> plugin vars
-function __my_appearance_propagate() {
+function _zac.propagate() {
   # During shell startup, let plugins initialize first.
   (( _zsh_appearance_control[logon] )) && return
 
@@ -36,7 +36,7 @@ function __my_appearance_propagate() {
 
 # This function returns the OS appearance as the ground truth.
 # It must set REPLY to 0/1.
-function _get_OS_appearance() {
+function _zac.get_os_appearance() {
   local dark_mode
 
   # If in TMUX, we use @dark_appearance as the ground truth
@@ -58,22 +58,17 @@ function _get_OS_appearance() {
   REPLY=$dark_mode
 }
 
-# Backward-compatible misspelling.
-function _get_OS_apperance() {
-  _get_OS_appearance "$@"
-}
-
-function __my_appearance_sync() {
+function _zac.sync() {
   local dark_mode old_mode changed=0
 
-  _get_OS_appearance
+  _zac.get_os_appearance
   dark_mode=$REPLY
   old_mode=${_zsh_appearance_control[dark_mode]}
 
   if [[ $old_mode != $dark_mode ]]; then
     _zsh_appearance_control[dark_mode]=$dark_mode
     changed=1
-    __my_appearance_propagate
+    _zac.propagate
   fi
 
   _zsh_appearance_control[last_sync_changed]=$changed
@@ -89,9 +84,9 @@ if [[ -o interactive ]]; then
   _zsh_appearance_control[logon]=1
 
   # Run one sync early (initializes cache), but don't fight plugin init yet
-  __my_appearance_sync
+  _zac.sync
   
-  __my_appearance_precmd() {
+  _zac.precmd() {
     # First prompt: allow plugins to finish init, then propagate once.
     if (( _zsh_appearance_control[logon] )); then
       _zsh_appearance_control[logon]=0
@@ -100,19 +95,19 @@ if [[ -o interactive ]]; then
     fi
 
     if (( _zsh_appearance_control[needs_sync] )); then
-      __my_appearance_sync
+      _zac.sync
     fi
 
     if (( _zsh_appearance_control[needs_init_propagate] )); then
       _zsh_appearance_control[needs_init_propagate]=0
       if (( ! _zsh_appearance_control[last_sync_changed] )); then
-        __my_appearance_propagate
+        _zac.propagate
       fi
     fi
   }
 
-  if (( ${precmd_functions[(I)__my_appearance_precmd]} == 0 )); then
-    precmd_functions+=(__my_appearance_precmd)
+  if (( ${precmd_functions[(I)_zac.precmd]} == 0 )); then
+    precmd_functions+=(_zac.precmd)
   fi
 fi
 
