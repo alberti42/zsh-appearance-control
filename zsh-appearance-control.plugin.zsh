@@ -109,6 +109,16 @@ if [[ -o interactive ]]; then
   if (( ${precmd_functions[(I)_zac.precmd]} == 0 )); then
     precmd_functions+=(_zac.precmd)
   fi
+
+  _zac.preexec() {
+    if (( _zsh_appearance_control[needs_sync] )); then
+      _zac.sync
+    fi
+  }
+
+  if (( ${preexec_functions[(I)_zac.preexec]} == 0 )); then
+    preexec_functions+=(_zac.preexec)
+  fi
 fi
 
 # Signal handler: avoid running tmux/ps/subprocess here. Just mark needs_sync.
