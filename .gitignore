@@ -1,1 +1,4 @@
 **/*.zwc
+*.sublime-project
+*.sublime-workspace
+*.md
