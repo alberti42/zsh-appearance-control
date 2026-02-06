@@ -16,6 +16,7 @@ _zsh_appearance_control[needs_init_propagate]=0
 _zsh_appearance_control[last_sync_changed]=0
 _zsh_appearance_control[logon]=0
 _zsh_appearance_control[on_source.redraw_prompt]=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}
+_zsh_appearance_control[on_change.redraw_prompt]=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}
 
 # propagate from _zsh_appearance_control[dark_mode] -> plugin vars
 function _zac.propagate() {
@@ -46,11 +47,25 @@ function _zac.get_os_appearance() {
   # If in TMUX, we use @dark_appearance as the ground truth
   if [[ -n $TMUX ]]; then
     # Read tmux option (0/1). If unset, default to 0.
-    read -r dark_mode < <(tmux show-options -gvq @dark_appearance 2>/dev/null)
+    read -r dark_mode < <(command tmux show-options -gvq @dark_appearance 2>/dev/null)
     : ${dark_mode:=0}
   else
-    # TODO: source OS appearance outside tmux
-    dark_mode=0
+    case $OSTYPE in
+      (darwin*)
+        dark_mode=$(command osascript 2>/dev/null <<'OSA'
+tell application "System Events"
+	tell appearance preferences
+		get dark mode
+	end tell
+end tell
+OSA
+        )
+        [[ $dark_mode == true ]] && dark_mode=1 || dark_mode=0
+      ;;
+      (*)
+        dark_mode=0
+      ;;
+    esac
   fi
 
   # Normalize to 0/1 (tmux options may be set as on/true/yes).
@@ -77,6 +92,101 @@ function _zac.sync() {
 
   _zsh_appearance_control[last_sync_changed]=$changed
   _zsh_appearance_control[needs_sync]=0
+
+  if (( changed )) && (( _zsh_appearance_control[on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
+    zle reset-prompt 2>/dev/null
+  fi
+}
+
+function _zac._set_os_appearance() {
+  local target=$1
+
+  case $OSTYPE in
+    (darwin*)
+      if (( target )); then
+        command osascript >/dev/null 2>&1 <<'OSA'
+tell application "System Events"
+	tell appearance preferences
+		set dark mode to true
+	end tell
+end tell
+OSA
+      else
+        command osascript >/dev/null 2>&1 <<'OSA'
+tell application "System Events"
+	tell appearance preferences
+		set dark mode to false
+	end tell
+end tell
+OSA
+      fi
+    ;;
+    (*)
+      return 1
+    ;;
+  esac
+}
+
+function _zac._tmux_set_dark_mode() {
+  [[ -n $TMUX ]] || return 1
+  command tmux set-option -gq @dark_appearance "$1" 2>/dev/null
+}
+
+function zac() {
+  local cmd=${1:-status}
+  shift $(( $# > 0 ? 1 : 0 ))
+
+  case $cmd in
+    (-h|--help|help)
+      print -r -- "usage: zac <status|sync|toggle|dark|light>"
+      return 0
+    ;;
+
+    (status)
+      if (( ${+_zsh_appearance_control[dark_mode]} )) && [[ -n ${_zsh_appearance_control[dark_mode]} ]]; then
+        (( _zsh_appearance_control[dark_mode] )) && print -r -- dark || print -r -- light
+      else
+        print -r -- unknown
+      fi
+      return 0
+    ;;
+
+    (sync)
+      _zsh_appearance_control[needs_sync]=1
+      _zac.sync
+      return $?
+    ;;
+
+    (toggle|dark|light)
+      local target
+
+      if [[ $cmd == toggle ]]; then
+        _zac.get_os_appearance
+        target=$(( REPLY ? 0 : 1 ))
+      elif [[ $cmd == dark ]]; then
+        target=1
+      else
+        target=0
+      fi
+
+      if [[ -n $TMUX ]]; then
+        _zac._tmux_set_dark_mode $target
+      fi
+
+      if ! _zac._set_os_appearance $target; then
+        print -r -- "zac: unsupported platform ($OSTYPE)" >&2
+        return 1
+      fi
+
+      _zsh_appearance_control[needs_sync]=1
+      _zac.sync
+      (( target )) && print -r -- dark || print -r -- light
+      return 0
+    ;;
+  esac
+
+  print -r -- "zac: unknown command: $cmd" >&2
+  return 2
 }
 
 local _zac_in_zle=0
