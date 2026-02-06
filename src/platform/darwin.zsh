@@ -15,22 +15,20 @@ OSA
 
 function _zac.os_dark_mode.set() {
   local target=$1
+  local value tpl script
 
-  if (( target )); then
-    command osascript >/dev/null 2>&1 <<'OSA'
+  (( target )) && value=true || value=false
+
+  tpl=$(command cat <<'OSA'
 tell application "System Events"
 	tell appearance preferences
-		set dark mode to true
+		set dark mode to %s
 	end tell
 end tell
 OSA
-  else
-    command osascript >/dev/null 2>&1 <<'OSA'
-tell application "System Events"
-	tell appearance preferences
-		set dark mode to false
-	end tell
-end tell
-OSA
-  fi
+  )
+
+  builtin printf -v script -- "$tpl" "$value"
+
+  command osascript >/dev/null 2>&1 <<<"$script"
 }
