@@ -17,16 +17,15 @@
 function _zac.init() {
   # One-time initialization performed after modules are loaded.
   #
-  # Note: we intentionally do not query external state here. We only mark the
-  # plugin as needing a sync, which will be performed by hooks (precmd/preexec)
-  # or explicitly via `zac sync`.
+  # Note: we intentionally do not query external state here.
   (( ${+_zsh_appearance_control[_inited]} )) && return 0
   _zsh_appearance_control[_inited]=1
 
   local in_zle=0
   [[ -n ${ZLE_STATE-} ]] && in_zle=1
 
-  _zsh_appearance_control[needs_sync]=1
+  # Do not force a sync on init. Sync should be triggered explicitly (USR1 or
+  # `zac sync`) to avoid prompt stalls.
   _zsh_appearance_control[needs_init_propagate]=0
   _zsh_appearance_control[last_sync_changed]=0
 
@@ -87,7 +86,6 @@ function _zac.precmd() {
   # propagation.
   if (( _zsh_appearance_control[logon] )); then
     _zsh_appearance_control[logon]=0
-    _zsh_appearance_control[needs_sync]=1
     _zsh_appearance_control[needs_init_propagate]=1
   fi
 
