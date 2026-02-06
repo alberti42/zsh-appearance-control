@@ -5,6 +5,11 @@
 # - the sync path that reads ground truth and updates cached is_dark
 # - the propagation path that updates prompt-related variables / callback
 #
+# This file is also self-contained:
+# - it knows how to compile+source other modules in this plugin
+# - it sources its hard dependencies (tmux + ground truth)
+# - it self-initializes by calling _zac.init once at EOF
+#
 # State keys used (see also zsh-appearance-control.plugin.zsh):
 # - _zsh_appearance_control[is_dark]                cached boolean (0/1)
 # - _zsh_appearance_control[needs_sync]             1 => call _zac.sync soon
@@ -13,6 +18,45 @@
 # - _zsh_appearance_control[last_sync_changed]      1 => last sync changed is_dark
 # - _zsh_appearance_control[callback.fnc]           optional function name
 # - _zsh_appearance_control[on_change.redraw_prompt] if sync runs in ZLE, redraw
+
+typeset -gA _zsh_appearance_control
+
+function _zac.module.compile() {
+  # Compile a script to a .zwc if ZAC_COMPILE=1 and the .zwc is missing/stale.
+  local script=$1
+  local compile=${ZAC_COMPILE:-1}
+
+  (( compile )) || return 0
+  [[ -n $script ]] || return 1
+
+  local compiled_script="${script}.zwc"
+  if [[ ! -f $compiled_script || $script -nt $compiled_script ]]; then
+    zcompile -Uz -- "$script" "$compiled_script" 2>/dev/null || true
+  fi
+}
+
+function _zac.module.compile_and_source() {
+  # Compile (optional) and source a plugin module by workspace-relative path.
+  local module=$1
+
+  local dir=${_zsh_appearance_control[plugin.dir]:-}
+  if [[ -z $dir ]]; then
+    local core_path=${${(%):-%x}:a}
+    dir=${core_path:h:h}
+    _zsh_appearance_control[plugin.dir]=$dir
+  fi
+
+  local script="$dir/$module"
+  _zac.module.compile "$script"
+  builtin source "$script"
+}
+
+# Compile this core module for subsequent shells.
+_zac.module.compile "${${(%):-%x}:a}"
+
+# Source hard dependencies (idempotent).
+(( $+functions[_zac.tmux_dark_mode.query] )) || _zac.module.compile_and_source src/platform/tmux.zsh
+(( $+functions[_zac.dark_mode.query_ground_truth] )) || _zac.module.compile_and_source src/platform/ground_truth.zsh
 
 function _zac.init.config() {
   # Read user configuration from env vars.
@@ -46,7 +90,7 @@ function _zac.init.debug() {
   (( _zsh_appearance_control[debug.mode] )) || return 0
 
   if (( $+functions[_zac.debug.init] == 0 )); then
-    (( $+functions[_zac.module.source] )) && _zac.module.source src/debug.zsh
+    _zac.module.compile_and_source src/debug.zsh
   fi
 }
 
@@ -202,3 +246,6 @@ function _zac.preexec() {
     _zac.sync
   fi
 }
+
+# Self-init when sourced.
+_zac.init

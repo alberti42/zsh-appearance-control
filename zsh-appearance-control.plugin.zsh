@@ -45,6 +45,7 @@ _zsh_appearance_control[plugin.dir]=${${(%):-%x}:a:h}
 #+#+#+#+############################################################
 
 # Bootstrap-time no-op logger.
+# Ensure we always have a safe logger (bootstrap normally defines this).
 # The debug module overwrites _zac.debug.log when ZAC_DEBUG=1.
 function _zac.debug.log() { return 0 }
 
