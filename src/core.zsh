@@ -14,13 +14,50 @@
 # - _zsh_appearance_control[callback.fnc]           optional function name
 # - _zsh_appearance_control[on_change.redraw_prompt] if sync runs in ZLE, redraw
 
-function _zac.init() {
-  # One-time initialization performed after modules are loaded.
+function _zac.init.config() {
+  # Read user configuration from env vars.
+  # This is the only place that reads ZAC_* env vars.
+
+  : ${_zsh_appearance_control[callback.fnc]:=''}
+  : ${_zsh_appearance_control[callback.fnc]:=${ZAC_CALLBACK_FNC:-''}}
+
+  : ${_zsh_appearance_control[on_source.redraw_prompt]:=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}}
+  : ${_zsh_appearance_control[on_change.redraw_prompt]:=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}}
+
+  : ${_zsh_appearance_control[debug.mode]:=${ZAC_DEBUG:-0}}
+}
+
+function _zac.init.state() {
+  # Initialize internal state keys (do not read external ground truth here).
+
+  : ${_zsh_appearance_control[is_dark]:=''}
+  : ${_zsh_appearance_control[needs_sync]:=0}
+  : ${_zsh_appearance_control[needs_init_propagate]:=0}
+  : ${_zsh_appearance_control[last_sync_changed]:=0}
+  : ${_zsh_appearance_control[logon]:=0}
+
+  : ${_zsh_appearance_control[debug.fifo]:=''}
+  : ${_zsh_appearance_control[debug.fd]:=''}
+  : ${_zsh_appearance_control[debug.start_ts]:=''}
+}
+
+function _zac.init.debug() {
+  # Load and initialize debug module if enabled.
+  (( _zsh_appearance_control[debug.mode] )) || return 0
+
+  if (( $+functions[_zac.debug.init] == 0 )); then
+    (( $+functions[_zac.module.source] )) && _zac.module.source src/debug.zsh
+  fi
+
+  (( $+functions[_zac.debug.init] )) && _zac.debug.init
+}
+
+function _zac.init.shell() {
+  # Per-shell startup initialization.
   #
-  # Note: we intentionally do not query external state here.
-  (( ${+_zsh_appearance_control[_inited]} )) && return 0
-  _zac.debug.log "core | init"
-  _zsh_appearance_control[_inited]=1
+  # Must not query external state.
+  (( ${+_zsh_appearance_control[_shell_inited]} )) && return 0
+  _zsh_appearance_control[_shell_inited]=1
 
   local in_zle=0
   [[ -n ${ZLE_STATE-} ]] && in_zle=1
@@ -37,6 +74,51 @@ function _zac.init() {
     # During shell startup, keep logon=1 until the first prompt.
     _zsh_appearance_control[logon]=1
   fi
+}
+
+function _zac.init() {
+  # Public entry point called once from zsh-appearance-control.plugin.zsh.
+  #
+  # Responsibilities:
+  # - Initialize config (env) + internal defaults
+  # - Initialize debug (if enabled)
+  # - Initialize runtime flags (logon, etc.)
+  # - Register zsh integration points (hooks + TRAPUSR1)
+  #
+  # Non-responsibilities:
+  # - No external queries (tmux/OS) and no sync.
+  (( ${+_zsh_appearance_control[_inited]} )) && return 0
+  _zsh_appearance_control[_inited]=1
+
+  _zac.init.config
+  _zac.init.state
+  _zac.init.debug
+  _zac.init.shell
+
+  _zac.debug.log "init | begin"
+
+  if (( ${precmd_functions[(I)_zac.precmd]} == 0 )); then
+    _zac.debug.log "init | hook precmd"
+    precmd_functions+=(_zac.precmd)
+  fi
+
+  if (( ${preexec_functions[(I)_zac.preexec]} == 0 )); then
+    _zac.debug.log "init | hook preexec"
+    preexec_functions+=(_zac.preexec)
+  fi
+
+  # Signal handler: keep it cheap. Do not run tmux/osascript here.
+  TRAPUSR1() {
+    _zsh_appearance_control[needs_sync]=1
+  }
+
+  if [[ -n ${ZLE_STATE-} ]] && (( _zsh_appearance_control[on_source.redraw_prompt] )); then
+    _zac.debug.log "init | redraw on source"
+    _zac.propagate
+    zle reset-prompt 2>/dev/null
+  fi
+
+  _zac.debug.log "init | done"
 }
 
 # Propagate from _zsh_appearance_control[is_dark] -> plugin vars.
