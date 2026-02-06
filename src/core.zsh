@@ -10,14 +10,12 @@
 # - it sources its hard dependencies (tmux + ground truth)
 # - it self-initializes by calling _zac.init once at EOF
 #
-# State keys used (see also zsh-appearance-control.plugin.zsh):
-# - _zsh_appearance_control[is_dark]                cached boolean (0/1)
-# - _zsh_appearance_control[needs_sync]             1 => call _zac.sync soon
-# - _zsh_appearance_control[logon]                  1 => avoid touching others
-# - _zsh_appearance_control[needs_init_propagate]   1 => propagate once post-logon
-# - _zsh_appearance_control[last_sync_changed]      1 => last sync changed is_dark
-# - _zsh_appearance_control[callback.fnc]           optional function name
-# - _zsh_appearance_control[on_change.redraw_prompt] if sync runs in ZLE, redraw
+####################################################################
+# State
+#
+# State is stored in the global associative array:
+#   _zsh_appearance_control[...]
+####################################################################
 
 typeset -gA _zsh_appearance_control
 
@@ -74,26 +72,45 @@ function _zac.init.config() {
   # Read user configuration from env vars.
   # This is the only place that reads ZAC_* env vars.
 
+  # callback.fnc: optional function name called as: $callback <is_dark>
   : ${_zsh_appearance_control[callback.fnc]:=''}
   : ${_zsh_appearance_control[callback.fnc]:=${ZAC_CALLBACK_FNC:-''}}
 
+  # on_source.redraw_prompt: if sourced while already in ZLE, redraw prompt
   : ${_zsh_appearance_control[on_source.redraw_prompt]:=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}}
+
+  # on_change.redraw_prompt: if a sync runs in ZLE and is_dark changes, redraw
   : ${_zsh_appearance_control[on_change.redraw_prompt]:=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}}
 
+  # debug.mode: enable debug FIFO logging.
   : ${_zsh_appearance_control[debug.mode]:=${ZAC_DEBUG:-0}}
 }
 
 function _zac.init.state() {
   # Initialize internal state keys (do not read external ground truth here).
 
+  # is_dark: cached boolean (0/1). May be empty until first sync or zac command.
   : ${_zsh_appearance_control[is_dark]:=''}
+
+  # needs_sync: 1 => hooks call _zac.sync at the next opportunity.
   : ${_zsh_appearance_control[needs_sync]:=0}
+
+  # needs_init_propagate: 1 => propagate once after first prompt.
   : ${_zsh_appearance_control[needs_init_propagate]:=0}
+
+  # last_sync_changed: 1 if the last _zac.sync changed is_dark.
   : ${_zsh_appearance_control[last_sync_changed]:=0}
+
+  # logon: while 1, _zac.propagate avoids touching other plugins.
   : ${_zsh_appearance_control[logon]:=0}
 
+  # debug.fifo: shared FIFO path used by the debug module.
   : ${_zsh_appearance_control[debug.fifo]:=''}
+
+  # debug.fd: per-shell FD used for non-blocking debug writes.
   : ${_zsh_appearance_control[debug.fd]:=''}
+
+  # debug.start_ts: timestamp captured when debug module is initialized.
   : ${_zsh_appearance_control[debug.start_ts]:=''}
 }
 

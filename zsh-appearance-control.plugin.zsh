@@ -32,7 +32,7 @@ typeset -gA _zsh_appearance_control
 
 _zsh_appearance_control[plugin.dir]=${${(%):-%x}:a:h}
 
-#+#+#+#+############################################################
+####################################################################
 # Bootstrap
 #
 # This file is the only file sourced by the plugin manager.
@@ -41,7 +41,7 @@ _zsh_appearance_control[plugin.dir]=${${(%):-%x}:a:h}
 # - establish the global state map
 # - find the plugin directory
 # - source the core module (which compiles/sources its deps and self-inits)
-#+#+#+#+############################################################
+####################################################################
 
 # Bootstrap-time no-op logger.
 # Ensure we always have a safe logger (bootstrap normally defines this).
