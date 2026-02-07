@@ -9,8 +9,7 @@
 
 function zac() {
   # CLI dispatcher.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   _zac.debug.log "cli | zac $*"
   local cmd=${1:-status}
@@ -37,7 +36,11 @@ function zac() {
       _zac.debug.log "cli | sync"
       _zac[state.needs_sync]=1
       _zac.sync
-      return $?
+      local rc=$?
+      if (( rc == 0 )) && (( _zac[state.last_sync_changed] )); then
+        _zac.propagate
+      fi
+      return $rc
     ;;
 
     (debug)
@@ -81,8 +84,7 @@ function zac() {
 
 function _zac.cli.init() {
   # CLI module init (idempotent).
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   (( ${+_zac[guard.cli_inited]} )) && return 0
   _zac[guard.cli_inited]=1

@@ -19,14 +19,20 @@
 
 typeset -gA _zac
 
+# zsh conventional return channels.
+#
+# We predeclare these so functions that intentionally set REPLY/reply do not
+# trigger `warn_create_global` warnings.
+typeset -g REPLY
+typeset -ga reply
+
 # Debug CLI controller stub.
 #
 # The debug module is optional and is only eager-loaded when ZAC_DEBUG=1.
 # However, the user-facing `zac debug ...` command should work even when debug
 # is disabled by default.
 function _zac.debug.controller() {
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   _zac.module.compile_and_source src/debug.zsh || return $?
   _zac.debug.controller "$@"
@@ -34,8 +40,7 @@ function _zac.debug.controller() {
 
 function _zac.module.compile() {
   # Compile a script to a .zwc if ZAC_COMPILE=1 and the .zwc is missing/stale.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   local script=$1
   local compile=${ZAC_COMPILE:-1}
@@ -53,8 +58,7 @@ function _zac.module.compile() {
 
 function _zac.module.compile_and_source() {
   # Compile (optional) and source a plugin module by workspace-relative path.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   local module=$1
 
@@ -90,8 +94,7 @@ _zac.module.compile "${${(%):-%x}:a}"
 function _zac.init.config() {
   # Read user configuration from env vars.
   # This is the only place that reads ZAC_* env vars.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   # callback.fnc: optional function name called as: $callback <is_dark>
   : ${_zac[cfg.callback_fnc]:=''}
@@ -109,8 +112,7 @@ function _zac.init.config() {
 
 function _zac.init.state() {
   # Initialize internal state keys (do not read external ground truth here).
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   # is_dark: cached boolean (0/1). May be empty until first sync or zac command.
   : ${_zac[state.is_dark]:=''}
@@ -142,8 +144,7 @@ function _zac.init.state() {
 
 function _zac.init.debug() {
   # Load and initialize debug module if enabled.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   (( _zac[cfg.debug_mode] )) || return 0
 
@@ -156,8 +157,7 @@ function _zac.init.shell() {
   # Per-shell startup initialization.
   #
   # Must not query external state.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   (( ${+_zac[guard.shell_inited]} )) && return 0
   _zac[guard.shell_inited]=1
@@ -190,8 +190,7 @@ function _zac.init() {
   #
   # Non-responsibilities:
   # - No external queries (tmux/OS) and no sync.
-  builtin emulate -LR zsh
-  builtin setopt warn_create_global no_short_loops
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   # These are special global hook arrays in zsh.
   # Declare them explicitly to avoid `warn_create_global` noise.
@@ -218,6 +217,11 @@ function _zac.init() {
   fi
 
   # Signal handler: keep it cheap. Do not run tmux/osascript here.
+  #
+  # Exception: TRAPUSR1 must be global for this shell process.
+  # `emulate -L/-LR` enables local trap scoping; disable it right before
+  # defining traps.
+  builtin unsetopt localtraps 2>/dev/null
   #
   # TRAPUSR1 is global per-shell state, so if another plugin already defined a
   # handler we chain it.
@@ -252,6 +256,8 @@ function _zac.propagate() {
   #
   # This function must be fast and side-effect-safe because it can be called
   # from hooks. It does not query tmux/OS.
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+
   (( _zac[state.logon] )) && return
 
   _zac.debug.log "core | propagate | is_dark=${_zac[state.is_dark]:-}"
@@ -259,7 +265,7 @@ function _zac.propagate() {
   local cb=${_zac[cfg.callback_fnc]}
   if [[ -n $cb && $+functions[$cb] -eq 1 ]]; then
     local is_dark=${_zac[state.is_dark]:-0}
-    
+     
     $cb $is_dark
   fi
 }
@@ -268,7 +274,10 @@ function _zac.sync() {
   # Sync cached is_dark with the external ground truth.
   #
   # Ground truth is queried via _zac.dark_mode.query_ground_truth (platform).
-  # If the value changes, we update the cache and call _zac.propagate.
+  # If the value changes, we update the cache and set state.last_sync_changed.
+  # Callers decide whether/when to propagate.
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+
   local is_dark old_mode changed=0
 
   _zac.debug.log "core | sync | start"
@@ -281,18 +290,12 @@ function _zac.sync() {
   if [[ $old_mode != $is_dark ]]; then
     _zac[state.is_dark]=$is_dark
     changed=1
-    _zac.propagate
   fi
 
   _zac.debug.log "core | sync | changed=${changed}"
 
   _zac[state.last_sync_changed]=$changed
   _zac[state.needs_sync]=0
-
-  if (( changed )) && (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
-    # Only meaningful if a sync happens while ZLE is active.
-    zle reset-prompt 2>/dev/null
-  fi
 }
 
 function _zac.precmd() {
@@ -308,6 +311,15 @@ function _zac.precmd() {
   if (( _zac[state.needs_sync] )); then
     _zac.debug.log "core | precmd | needs_sync=1"
     _zac.sync
+
+    if (( _zac[state.last_sync_changed] )); then
+      _zac.propagate
+
+      if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
+        # Only meaningful if a sync happens while ZLE is active.
+        zle reset-prompt 2>/dev/null
+      fi
+    fi
   fi
 
   if (( _zac[state.needs_init_propagate] )); then
@@ -327,6 +339,14 @@ function _zac.preexec() {
   if (( _zac[state.needs_sync] )); then
     _zac.debug.log "core | preexec | needs_sync=1"
     _zac.sync
+
+    if (( _zac[state.last_sync_changed] )); then
+      _zac.propagate
+
+      if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
+        zle reset-prompt 2>/dev/null
+      fi
+    fi
   fi
 }
 

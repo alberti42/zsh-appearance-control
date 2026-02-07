@@ -26,6 +26,8 @@ function _zac.tmux_dark_mode.query() {
 }
 
 function _zac.tmux_dark_mode.set() {
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+
   # Set tmux option @dark_appearance.
   #
   # This is useful when the user triggers a change from inside the terminal.
