@@ -4,9 +4,20 @@
   <img src="logo/logo-zsh-appearance-control.png" alt="zsh-appearance-control logo" width="250" />
 </p>
 
-`zsh-appearance-control` is a Zsh plugin that helps your shell “remember” whether you are in light mode or dark mode.
+`zsh-appearance-control` makes switching between light and dark terminal themes feel smooth, and helps keep your shells and tools in sync with your OS appearance.
 
-If you use a theme, prompt, or other plugins that should look different in dark mode, this plugin gives you a simple, reliable switch you can build on.
+It gives you two things:
+
+1) a shared, always-updated “dark or light?” flag (tmux option or cache file)
+2) a safe way to nudge running shells to resync when that flag changes
+
+If you use tmux, it integrates especially smoothly: tmux can hold the shared flag as `@dark_appearance`, so every pane sees the same truth. If you do not use tmux, the plugin uses a small cache file instead.
+
+This README also includes minimal, working examples of what that enables:
+
+- tmux theme switching
+- Neovim auto theme switching (by watching the appearance file) — see [Neovim](#neovim-switch-running-instances-on-change)
+- Emacs auto theme switching (by watching the appearance file) — see [Emacs](#emacs-auto-switch-catppuccin-flavour)
 
 It’s designed to be calm and predictable:
 
@@ -341,6 +352,66 @@ if handle then
   end)
 end
 ```
+
+## Emacs: auto switch Catppuccin flavour
+
+Emacs also has built-in file watching, so you can use the same idea: watch the appearance file and switch theme when it changes.
+
+If you use the Catppuccin theme for Emacs, this minimal setup switches between `macchiato` (dark) and `frappe` (light) based on `ZAC_CACHE_DIR/appearance`:
+
+```elisp
+;; Catppuccin for Emacs https://github.com/catppuccin/emacs
+(use-package catppuccin-theme)
+
+(require 'subr-x)
+
+(defvar zac--watch nil)
+(defvar zac--last-catppuccin-flavor nil)
+
+(defun zac--appearance-file ()
+  (expand-file-name
+   "appearance"
+   (or (getenv "ZAC_CACHE_DIR")
+       (expand-file-name "zac" (or (getenv "XDG_CACHE_HOME")
+                                   (expand-file-name "~/.cache"))))))
+
+(defun zac--read-appearance ()
+  (when (file-readable-p (zac--appearance-file))
+    (string-trim
+     (with-temp-buffer
+       (insert-file-contents (zac--appearance-file))
+       (buffer-string)))))
+
+(defun zac--apply-appearance ()
+  (let* ((v (zac--read-appearance))
+         (flavor (if (string= v "1") 'macchiato 'frappe)))
+    (unless (eq zac--last-catppuccin-flavor flavor)
+      (setq zac--last-catppuccin-flavor flavor)
+      (setq catppuccin-flavor flavor)
+      (mapc #'disable-theme custom-enabled-themes)
+      (load-theme 'catppuccin t)
+      ;; Optional: keep terminal Emacs backgrounds transparent
+      (set-face-attribute 'default nil :background "unspecified-bg")
+      (set-face-attribute 'mode-line nil :background "unspecified-bg")
+      (set-face-attribute 'mode-line-inactive nil :background "unspecified-bg"))))
+
+(defun zac-watch-start ()
+  (interactive)
+  (zac--apply-appearance)
+  (when (fboundp 'file-notify-add-watch)
+    (unless zac--watch
+      (setq zac--watch
+            (file-notify-add-watch
+             (zac--appearance-file)
+             '(change)
+             (lambda (_event)
+               (zac--apply-appearance)))))))
+
+;; Start watcher automatically.
+(zac-watch-start)
+```
+
+Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch cache ...`), Emacs can follow along.
 
 ## Author
 - **Author:** Andrea Alberti
