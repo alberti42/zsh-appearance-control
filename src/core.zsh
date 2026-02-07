@@ -105,6 +105,28 @@ function _zac.init.config() {
   # enable_ssh_tmux: optionally install the ssh-tmux lazy stub.
   : ${_zac[cfg.enable_ssh_tmux]:=${ZAC_ENABLE_SSH_TMUX:-1}}
 
+  # linux.desktop: enable desktop-specific OS setters on Linux.
+  #
+  # Values:
+  # - gnome: enable GNOME integration (gsettings)
+  # - none:  disable desktop integration even if auto-detected
+  # - empty: auto-detect via XDG_CURRENT_DESKTOP
+  local linux_desktop=${ZAC_LINUX_DESKTOP:-''}
+  case $linux_desktop in
+    (none) linux_desktop='' ;;
+    (gnome) ;; 
+    ('')
+      if [[ ${XDG_CURRENT_DESKTOP-} == *GNOME* ]]; then
+        linux_desktop=gnome
+      fi
+    ;;
+    (*)
+      # Unknown value: treat as disabled.
+      linux_desktop=''
+    ;;
+  esac
+  : ${_zac[cfg.linux_desktop]:=$linux_desktop}
+
   # cache.dir: base directory for non-tmux ground truth and pid registry.
   # Defaults to XDG cache dir when available.
   local cache_base

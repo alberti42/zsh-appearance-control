@@ -69,16 +69,29 @@ builtin source "${_zac[meta.plugin_dir]}/src/core.zsh"
     (( ${+functions[compdef]} )) && compdef ssh-tmux=ssh
   fi
 
-  function zac() {
-    # Lazy stub: source CLI (+ platform) and tail-call the real zac().
+function zac() {
+  # Lazy stub: source CLI (+ platform) and tail-call the real zac().
     #
     # Note: we intentionally do NOT guard this with a "loaded" flag.
     # The intended pattern is: sourcing src/cli.zsh overwrites this stub.
 
-    case $OSTYPE in
-      (darwin*) _zac.module.compile_and_source src/platform/darwin.zsh || return $? ;;
-      (*)       _zac.module.compile_and_source src/platform/unsupported.zsh || return $? ;;
-    esac
+  case $OSTYPE in
+    (darwin*)
+      _zac.module.compile_and_source src/platform/darwin.zsh || return $?
+    ;;
+
+    (linux*)
+      if [[ ${_zac[cfg.linux_desktop]:-} == gnome ]]; then
+        _zac.module.compile_and_source src/platform/linux-gnome.zsh || return $?
+      else
+        _zac.module.compile_and_source src/platform/unsupported.zsh || return $?
+      fi
+    ;;
+
+    (*)
+      _zac.module.compile_and_source src/platform/unsupported.zsh || return $?
+    ;;
+  esac
 
     _zac.module.compile_and_source src/cli.zsh || return $?
 
