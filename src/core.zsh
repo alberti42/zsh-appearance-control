@@ -64,9 +64,8 @@ function _zac.module.compile_and_source() {
 
   local dir=${_zac[meta.plugin_dir]:-}
   if [[ -z $dir ]]; then
-    local core_path=${${(%):-%x}:a}
-    dir=${core_path:h:h}
-    _zac[meta.plugin_dir]=$dir
+    print -r -- "zac: error: meta.plugin_dir is not set" >&2
+    return 1
   fi
 
   local script="$dir/$module"
@@ -85,7 +84,7 @@ function _zac.module.compile_and_source() {
 }
 
 # Compile this core module for subsequent shells.
-_zac.module.compile "${${(%):-%x}:a}"
+_zac.module.compile "${_zac[meta.plugin_dir]}/src/core.zsh"
 
 # Source hard dependencies (idempotent).
 (( $+functions[_zac.tmux_dark_mode.query] )) || _zac.module.compile_and_source src/platform/tmux.zsh
