@@ -1,0 +1,71 @@
+#!/bin/zsh -f
+
+emulate -LR zsh -o warn_create_global -o no_short_loops
+
+# Standalone appearance probe (debug helper).
+#
+# This script is intended for debugging and ad-hoc inspection.
+# It is not designed to be part of the automatic appearance propagation chain.
+#
+# Usage:
+#   appearance-probe os    # prints 1 (dark) or 0 (light)
+#   appearance-probe tmux  # prints 1/0 from tmux @dark_appearance
+
+function _usage() {
+  print -r -- "usage: ${0:t} <os|tmux>" >&2
+}
+
+local type=${1:-}
+
+case $type in
+  (-h|--help|help|'')
+    _usage
+    exit 2
+  ;;
+esac
+
+case $type in
+  (tmux)
+    command -v tmux >/dev/null 2>&1 || {
+      print -r -- "appearance-probe: tmux not found" >&2
+      exit 1
+    }
+
+    local v
+    read -r v < <(command tmux show-options -gvq @dark_appearance 2>/dev/null)
+    : ${v:=0}
+
+    case $v in
+      (1|on|true|yes) print -r -- 1 ;;
+      (*)            print -r -- 0 ;;
+    esac
+    exit 0
+  ;;
+
+  (os)
+    case $OSTYPE in
+      (darwin*)
+        command -v defaults >/dev/null 2>&1 || {
+          print -r -- "appearance-probe: defaults not found" >&2
+          exit 1
+        }
+
+        local style
+        style=$(command defaults read -g AppleInterfaceStyle 2>/dev/null) || style=''
+        [[ $style == Dark ]] && print -r -- 1 || print -r -- 0
+        exit 0
+      ;;
+
+      (*)
+        print -r -- "appearance-probe: unsupported platform: $OSTYPE" >&2
+        exit 1
+      ;;
+    esac
+  ;;
+
+  (*)
+    print -r -- "appearance-probe: unsupported type: $type" >&2
+    _usage
+    exit 2
+  ;;
+esac
