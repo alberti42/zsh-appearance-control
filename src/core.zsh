@@ -103,9 +103,6 @@ function _zac.init.config() {
   # on_source.redraw_prompt: if sourced while already in ZLE, redraw prompt
   : ${_zac[cfg.on_source.redraw_prompt]:=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}}
 
-  # on_change.redraw_prompt: if a sync runs in ZLE and is_dark changes, redraw
-  : ${_zac[cfg.on_change.redraw_prompt]:=${ZAC_ON_CHANGE_REDRAW_PROMPT:-0}}
-
   # debug.mode: enable debug FIFO logging.
   : ${_zac[cfg.debug_mode]:=${ZAC_DEBUG:-0}}
 }
@@ -253,6 +250,12 @@ function _zac.init() {
     zle reset-prompt 2>/dev/null
   fi
 
+  # Intentional non-feature:
+  # We do not attempt to redraw the prompt when appearance changes arrive while
+  # the user is actively editing a command line in ZLE.
+  # The plugin only flips state.needs_sync in TRAPUSR1, and the next prompt/Enter
+  # will sync+propagate normally.
+
   _zac.debug.log "init | done"
 }
 
@@ -325,11 +328,6 @@ function _zac.precmd() {
 
   if (( _zac[state.needs_propagate] )); then
     _zac.propagate
-
-    if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
-      # Only meaningful if a propagate happens while ZLE is active.
-      zle reset-prompt 2>/dev/null
-    fi
   fi
 }
 
@@ -344,10 +342,6 @@ function _zac.preexec() {
 
   if (( _zac[state.needs_propagate] )); then
     _zac.propagate
-
-    if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
-      zle reset-prompt 2>/dev/null
-    fi
   fi
 }
 
