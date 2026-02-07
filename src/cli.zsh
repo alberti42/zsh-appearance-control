@@ -23,12 +23,17 @@ function zac() {
 
     (status)
       # Print cached state only; does not query OS/tmux.
+      #
+      # Contract:
+      # - Always prints 1 (dark) or 0 (light/unknown fallback)
+      # - Returns 0 when known, 1 when unknown
       if (( ${+_zac[state.is_dark]} )) && [[ -n ${_zac[state.is_dark]} ]]; then
-        (( _zac[state.is_dark] )) && print -r -- dark || print -r -- light
-      else
-        print -r -- unknown
+        print -r -- ${_zac[state.is_dark]}
+        return 0
       fi
-      return 0
+
+      print -r -- 0
+      return 1
     ;;
 
     (sync)
