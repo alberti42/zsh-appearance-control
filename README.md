@@ -173,3 +173,31 @@ end)
 ```
 
 If you already know you only use tmux (or only use non-tmux shells), you can remove the dispatch you do not need.
+
+## Example: tmux theme switching with @dark_appearance
+
+tmux is a great place to keep a single “appearance flag” that all panes can share.
+
+When your OS switches between light and dark mode, a watcher (for example WezTerm) can update tmux option `@dark_appearance`.
+From there, your tmux theme can instantly switch palettes, and every shell inside tmux can sync its own environment on the next prompt.
+
+The key idea is simple:
+
+- keep a boolean option in tmux: `@dark_appearance` (`1` for dark, `0` for light)
+- define your theme colors in terms of that flag
+
+Here is a tiny sketch:
+
+```tmux
+# ~/.tmux.conf
+source-file "$HOME/.config/tmux/catppuccin.conf"
+```
+
+```tmux
+# ~/.config/tmux/catppuccin.conf
+set-option -g @dark_appearance 0
+```
+
+This repo includes a complete example you can copy and adapt:
+
+- `examples/tmux/catppuccin.conf`
