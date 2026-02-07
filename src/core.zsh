@@ -153,7 +153,8 @@ function _zac.cache.pid.register() {
   # Register this shell PID for safe external signaling.
   #
   # This creates a file in: $cfg.cache_dir/pids/$$
-  # The file contains the process start time to avoid PID reuse hazards.
+  # The file contains the process start time as epoch seconds to avoid PID
+  # reuse hazards.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
   builtin setopt extended_glob
 
@@ -164,14 +165,39 @@ function _zac.cache.pid.register() {
   command mkdir -p -- "$pids_dir" 2>/dev/null || return 0
   command chmod 700 -- "$dir" "$pids_dir" 2>/dev/null || true
 
-  local lstart
-  lstart=$(command ps -p $$ -o lstart= 2>/dev/null) || lstart=''
-  [[ -n $lstart ]] || return 0
-  lstart=${lstart%%[[:space:]]##}
+  local start_epoch
+  start_epoch=$(_zac.cache.pid.start_epoch $$) || return 0
 
   local pid_file="$pids_dir/$$"
   umask 077
-  builtin print -r -- "$lstart" >| "$pid_file" 2>/dev/null || true
+  builtin print -r -- "$start_epoch" >| "$pid_file" 2>/dev/null || true
+}
+
+function _zac.cache.pid.start_epoch() {
+  # Print process start time as epoch seconds.
+  #
+  # This is used to avoid PID reuse hazards when externally signaling shells.
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+  builtin setopt extended_glob
+
+  local pid=$1
+  [[ $pid == <-> ]] || return 1
+
+  local lstart
+  lstart=$(LC_ALL=C LANG=C command ps -p "$pid" -o lstart= 2>/dev/null) || return 1
+  lstart=${lstart##[[:space:]]##}
+  lstart=${lstart%%[[:space:]]##}
+  [[ -n $lstart ]] || return 1
+
+  local start_epoch
+  case $OSTYPE in
+    (darwin*) start_epoch=$(LC_ALL=C LANG=C command date -j -f "%a %b %e %T %Y" "$lstart" +%s 2>/dev/null) ;;
+    (linux*)  start_epoch=$(LC_ALL=C LANG=C command date -d "$lstart" +%s 2>/dev/null) ;;
+    (*)       return 1 ;;
+  esac
+
+  [[ $start_epoch == <-> ]] || return 1
+  builtin print -r -- "$start_epoch"
 }
 
 function _zac.cache.pid.unregister() {
@@ -248,7 +274,7 @@ function _zac.init() {
 
   # These are special global hook arrays in zsh.
   # Declare them explicitly to avoid `warn_create_global` noise.
-  typeset -ga precmd_functions preexec_functions
+  typeset -ga precmd_functions preexec_functions zshexit_functions
 
   (( ${+_zac[guard.core_inited]} )) && return 0
   _zac[guard.core_inited]=1
@@ -257,6 +283,7 @@ function _zac.init() {
   _zac.init.state
   _zac.init.debug
   _zac.init.shell
+  _zac.cache.init
 
   _zac.debug.log "init | begin"
 

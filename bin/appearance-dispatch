@@ -18,6 +18,27 @@ function _usage() {
   print -r -- "usage: $_dispatch_script <tmux|cache> <on|off|1|0|true|false>" >&2
 }
 
+function _start_epoch_for_pid() {
+  # Print process start time as epoch seconds.
+  local pid=$1
+  [[ $pid == <-> ]] || return 1
+
+  local lstart start_epoch
+  lstart=$(LC_ALL=C LANG=C command ps -p "$pid" -o lstart= 2>/dev/null) || return 1
+  lstart=${lstart##[[:space:]]##}
+  lstart=${lstart%%[[:space:]]##}
+  [[ -n $lstart ]] || return 1
+
+  case $OSTYPE in
+    (darwin*) start_epoch=$(LC_ALL=C LANG=C command date -j -f "%a %b %e %T %Y" "$lstart" +%s 2>/dev/null) ;;
+    (linux*)  start_epoch=$(LC_ALL=C LANG=C command date -d "$lstart" +%s 2>/dev/null) ;;
+    (*)       return 1 ;;
+  esac
+
+  [[ $start_epoch == <-> ]] || return 1
+  print -r -- "$start_epoch"
+}
+
 local type=${1:-}
 local mode=${2:-}
 
@@ -88,11 +109,11 @@ case $type in
 
       IFS= read -r stored_start <"$pid_file" 2>/dev/null || stored_start=''
       stored_start=${stored_start%%[[:space:]]##}
+      stored_start=${stored_start##[[:space:]]##}
+      [[ $stored_start == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
 
-      cur_start=$(command ps -p "$pid" -o lstart= 2>/dev/null) || cur_start=''
-      cur_start=${cur_start%%[[:space:]]##}
-
-      if [[ -z $cur_start || -z $stored_start || $cur_start != $stored_start ]]; then
+      cur_start=$(_start_epoch_for_pid "$pid") || cur_start=''
+      if [[ -z $cur_start || $cur_start != $stored_start ]]; then
         command rm -f -- "$pid_file" 2>/dev/null || true
         continue
       fi
