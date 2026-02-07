@@ -100,9 +100,6 @@ function _zac.init.config() {
   : ${_zac[cfg.callback_fnc]:=''}
   : ${_zac[cfg.callback_fnc]:=${ZAC_CALLBACK_FNC:-''}}
 
-  # on_source.redraw_prompt: if sourced while already in ZLE, redraw prompt
-  : ${_zac[cfg.on_source.redraw_prompt]:=${ZAC_ON_SOURCE_REDRAW_PROMPT:-0}}
-
   # debug.mode: enable debug FIFO logging.
   : ${_zac[cfg.debug_mode]:=${ZAC_DEBUG:-0}}
 }
@@ -161,25 +158,15 @@ function _zac.init.shell() {
   (( ${+_zac[guard.shell_inited]} )) && return 0
   _zac[guard.shell_inited]=1
 
-  # ZLE_STATE is set only while the ZLE line editor is active (widgets/hooks).
-  # It is typically empty while executing a command like: `source ...`.
-  local in_zle=0
-  [[ -n ${ZLE_STATE-} ]] && in_zle=1
-
   # Do not force a sync on init. Sync should be triggered explicitly (USR1 or
   # `zac sync`) to avoid prompt stalls.
   _zac[state.needs_propagate]=0
 
-  if (( in_zle )); then
-    # Rare: plugin sourced from a ZLE widget/hook.
-    # Allow immediate propagation + prompt redraw (if configured).
-    _zac[state.defer_propagate]=0
-  else
-    # Common: shell startup (or manual `source` from a normal prompt).
-    # Defer propagation until the next prompt to avoid fighting other plugins
-    # and to avoid calling user callbacks too early.
-    _zac[state.defer_propagate]=1
-  fi
+  # Defer propagation until the next prompt after plugin load.
+  #
+  # This avoids fighting other plugins/themes during startup and avoids calling
+  # user callbacks before their dependencies exist.
+  _zac[state.defer_propagate]=1
 }
 
 function _zac.init() {
@@ -242,12 +229,6 @@ function _zac.init() {
     }
 
     _zac[guard.trapusr1_wrapped]=1
-  fi
-
-  if [[ -n ${ZLE_STATE-} ]] && (( _zac[cfg.on_source.redraw_prompt] )); then
-    _zac.debug.log "init | redraw on source"
-    _zac.propagate
-    zle reset-prompt 2>/dev/null
   fi
 
   # Intentional non-feature:
