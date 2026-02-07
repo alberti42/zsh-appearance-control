@@ -1,5 +1,9 @@
 # zsh-appearance-control
 
+<p align="center">
+  <img src="logo/logo-zsh-appearance-control.png" alt="zsh-appearance-control logo" width="250" />
+</p>
+
 `zsh-appearance-control` is a Zsh plugin that helps your shell “remember” whether you are in light mode or dark mode.
 
 If you use a theme, prompt, or other plugins that should look different in dark mode, this plugin gives you a simple, reliable switch you can build on.
