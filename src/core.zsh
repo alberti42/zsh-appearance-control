@@ -19,6 +19,16 @@
 
 typeset -gA _zac
 
+# Debug CLI controller stub.
+#
+# The debug module is optional and is only eager-loaded when ZAC_DEBUG=1.
+# However, the user-facing `zac debug ...` command should work even when debug
+# is disabled by default.
+function _zac.debug.controller() {
+  _zac.module.compile_and_source src/debug.zsh || return $?
+  _zac.debug.controller "$@"
+}
+
 function _zac.module.compile() {
   # Compile a script to a .zwc if ZAC_COMPILE=1 and the .zwc is missing/stale.
   local script=$1

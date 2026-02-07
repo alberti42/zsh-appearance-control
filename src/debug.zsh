@@ -2,7 +2,7 @@
 
 # Debug utilities (opt-in).
 #
-# Enabled by env var: ZAC_DEBUG=1.
+# Enabled by env var: ZAC_DEBUG=1 (or dynamically via `zac debug on`).
 #
 # Implementation notes:
 # - We use a single shared FIFO per user so one monitor can observe all shells.
@@ -29,7 +29,10 @@ function _zac.debug.init() {
   # - sets _zac[debug.start_ts] to the init timestamp
 
   (( _zac[cfg.debug_mode] )) || return 0
-  [[ -n ${_zac[debug.fifo]:-} ]] && return 0
+  if [[ -n ${_zac[debug.fifo]:-} ]]; then
+    [[ -p ${_zac[debug.fifo]} ]] && return 0
+    _zac[debug.fifo]=''
+  fi
 
   local tmp=${TMPDIR:-/tmp}
   local user=${USER:-${LOGNAME:-unknown}}
@@ -83,26 +86,86 @@ function _zac.debug.log() {
   }
 }
 
-function zac.debug.follow() {
+function _zac.debug.console.follow() {
   # Follow the debug FIFO and print lines to the terminal.
   # This blocks; stop with Ctrl-C.
   local fifo=${_zac[debug.fifo]:-}
   if [[ -z $fifo ]]; then
-    print -r -- "zac.debug.follow: debug is not enabled (set ZAC_DEBUG=1 and re-source)" >&2
+    print -r -- "zac debug console: debug fifo is not initialized" >&2
     return 1
   fi
 
   if [[ ! -p $fifo ]]; then
-    print -r -- "zac.debug.follow: fifo not found: $fifo" >&2
+    print -r -- "zac debug console: fifo not found: $fifo" >&2
     return 1
   fi
 
-  print -r -- "-- following $fifo (Ctrl-C to stop) --"
+  print -r -- "-- zac debug console | following $fifo (Ctrl-C to stop) --"
 
   local line
   while IFS= read -r line; do
     print -r -- "$line"
   done <"$fifo"
+}
+
+function _zac.debug.controller() {
+  # Debug CLI controller.
+  #
+  # Usage:
+  #   zac debug on|off|status|console
+  local sub=${1:-status}
+  shift $(( $# > 0 ? 1 : 0 ))
+
+  case $sub in
+    (1|on|true|enable|enabled)
+      _zac[cfg.debug_mode]=1
+      _zac.debug.init || return $?
+      return 0
+    ;;
+
+    (0|off|false|disable|disabled)
+      _zac[cfg.debug_mode]=0
+
+      local fd=${_zac[debug.fd]:-}
+      if [[ -n $fd ]]; then
+        exec {fd}>&-
+        _zac[debug.fd]=''
+      fi
+
+      return 0
+    ;;
+
+    (status)
+      local enabled=0
+      (( _zac[cfg.debug_mode] )) && enabled=1
+
+      local fifo=${_zac[debug.fifo]:-}
+      local fifo_ok=0
+      [[ -n $fifo && -p $fifo ]] && fifo_ok=1
+
+      local fd_ok=0
+      [[ -n ${_zac[debug.fd]:-} ]] && fd_ok=1
+
+      print -r -- "enabled=${enabled} fifo=${fifo:-} fifo_ok=${fifo_ok} writer_fd=${fd_ok}"
+      return 0
+    ;;
+
+    (console)
+      # Monitor: implicitly enable debug for this shell.
+      _zac[cfg.debug_mode]=1
+      _zac.debug.init || return $?
+      _zac.debug.console.follow
+      return $?
+    ;;
+
+    (-h|--help|help)
+      print -r -- "usage: zac debug <on|off|status|console>"
+      return 0
+    ;;
+  esac
+
+  print -r -- "zac debug: unknown subcommand: $sub" >&2
+  return 2
 }
 
 function _zac.debug.module_init() {

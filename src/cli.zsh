@@ -15,7 +15,7 @@ function zac() {
 
   case $cmd in
     (-h|--help|help)
-      print -r -- "usage: zac <status|sync|toggle|dark|light|callback>"
+      print -r -- "usage: zac <status|sync|toggle|dark|light|callback|debug>"
       return 0
     ;;
 
@@ -58,6 +58,12 @@ function zac() {
 
       _zac[cfg.callback_fnc]="$1"
       return 0
+    ;;
+
+    (debug)
+      # Debug controller (lazy-loaded).
+      _zac.debug.controller "$@"
+      return $?
     ;;
 
     (toggle|dark|light)
