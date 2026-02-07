@@ -122,6 +122,9 @@ function _zac.init.state() {
 
   # debug.start_ts: timestamp captured when debug module is initialized.
   : ${_zac[debug.start_ts]:=''}
+
+  # guard.trapusr1_wrapped: 1 if we installed a chained TRAPUSR1 handler.
+  : ${_zac[guard.trapusr1_wrapped]:=0}
 }
 
 function _zac.init.debug() {
@@ -189,9 +192,24 @@ function _zac.init() {
   fi
 
   # Signal handler: keep it cheap. Do not run tmux/osascript here.
-  TRAPUSR1() {
-    _zac[state.needs_sync]=1
-  }
+  #
+  # TRAPUSR1 is global per-shell state, so if another plugin already defined a
+  # handler we chain it.
+  if (( ! _zac[guard.trapusr1_wrapped] )); then
+    if (( $+functions[TRAPUSR1] )); then
+      # Preserve any existing handler before we overwrite it.
+      # (Copying is cheaper and avoids re-parsing function text.)
+      # If this ever breaks on an older zsh, consider copying via `functions[...]`.
+      functions -c TRAPUSR1 _zac.trapusr1.prev 2>/dev/null
+    fi
+
+    TRAPUSR1() {
+      _zac[state.needs_sync]=1
+      (( $+functions[_zac.trapusr1.prev] )) && _zac.trapusr1.prev
+    }
+
+    _zac[guard.trapusr1_wrapped]=1
+  fi
 
   if [[ -n ${ZLE_STATE-} ]] && (( _zac[cfg.on_source.redraw_prompt] )); then
     _zac.debug.log "init | redraw on source"
