@@ -55,32 +55,33 @@ function _zac.debug.log() { return 0 }
 builtin source "${_zac[meta.plugin_dir]}/src/core.zsh"
 
 # Optional extras (lazy-loaded).
+{
+  if (( _zac[cfg.enable_ssh_tmux] )) && (( ${+functions[ssh-tmux]} == 0 )); then
+    function ssh-tmux() {
+      # Lazy stub: source module and tail-call the real ssh-tmux().
+      builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
-if (( _zac[cfg.enable_ssh_tmux] )) && (( ${+functions[ssh-tmux]} == 0 )); then
-  function ssh-tmux() {
-    # Lazy stub: source module and tail-call the real ssh-tmux().
-    builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+      _zac.module.compile_and_source src/ssh-tmux.zsh || return $?
+      ssh-tmux "$@"
+    }
 
-    _zac.module.compile_and_source src/ssh-tmux.zsh || return $?
-    ssh-tmux "$@"
+    # Enforce the same autocompletion for ssh-tmux as for ssh (when available).
+    (( ${+functions[compdef]} )) && compdef ssh-tmux=ssh
+  fi
+
+  function zac() {
+    # Lazy stub: source CLI (+ platform) and tail-call the real zac().
+    #
+    # Note: we intentionally do NOT guard this with a "loaded" flag.
+    # The intended pattern is: sourcing src/cli.zsh overwrites this stub.
+
+    case $OSTYPE in
+      (darwin*) _zac.module.compile_and_source src/platform/darwin.zsh || return $? ;;
+      (*)       _zac.module.compile_and_source src/platform/unsupported.zsh || return $? ;;
+    esac
+
+    _zac.module.compile_and_source src/cli.zsh || return $?
+
+    zac "$@"
   }
-
-  # Enforce the same autocompletion for ssh-tmux as for ssh (when available).
-  (( ${+functions[compdef]} )) && compdef ssh-tmux=ssh
-fi
-
-function zac() {
-  # Lazy stub: source CLI (+ platform) and tail-call the real zac().
-  #
-  # Note: we intentionally do NOT guard this with a "loaded" flag.
-  # The intended pattern is: sourcing src/cli.zsh overwrites this stub.
-
-  case $OSTYPE in
-    (darwin*) _zac.module.compile_and_source src/platform/darwin.zsh || return $? ;;
-    (*)       _zac.module.compile_and_source src/platform/unsupported.zsh || return $? ;;
-  esac
-
-  _zac.module.compile_and_source src/cli.zsh || return $?
-
-  zac "$@"
 }

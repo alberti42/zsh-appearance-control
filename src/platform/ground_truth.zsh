@@ -13,9 +13,20 @@ function _zac.dark_mode.query_ground_truth() {
     return $?
   fi
 
-  # TODO: non-tmux ground truth (e.g. file-based state).
-  # For now, fall back to the current cached value.
-  _zac.debug.log "truth | non-tmux TODO (using cache)"
-  REPLY=${_zac[state.is_dark]:-0}
-  return 0
+  # Non-tmux ground truth: file-based state in cfg.cache_dir.
+  local dir=${_zac[cfg.cache_dir]:-}
+  local file="$dir/appearance"
+  local v
+
+  if [[ -n $dir && -f $file ]]; then
+    IFS= read -r v <"$file" 2>/dev/null || v=''
+    case $v in
+      (1) REPLY=1; return 0 ;;
+      (0) REPLY=0; return 0 ;;
+    esac
+  fi
+
+  # Unknown.
+  REPLY=''
+  return 1
 }

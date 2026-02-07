@@ -1,6 +1,8 @@
 #!/bin/zsh -f
 
 emulate -LR zsh -o warn_create_global -o no_short_loops
+setopt extended_glob null_glob
+umask 077
 
 # External dispatcher for appearance changes.
 #
@@ -13,7 +15,7 @@ emulate -LR zsh -o warn_create_global -o no_short_loops
 
 function _usage() {
   local _dispatch_script=$1
-  print -r -- "usage: $_dispatch_script <tmux> <on|off|1|0|true|false>" >&2
+  print -r -- "usage: $_dispatch_script <tmux|cache> <on|off|1|0|true|false>" >&2
 }
 
 local type=${1:-}
@@ -54,6 +56,54 @@ case $type in
 
         command kill -USR1 "$pid" 2>/dev/null || true
       done
+  ;;
+
+  (cache)
+    local cache_dir=${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/zac}
+    local pids_dir="$cache_dir/pids"
+    local appearance_file="$cache_dir/appearance"
+
+    command mkdir -p -- "$pids_dir" 2>/dev/null || {
+      print -r -- "appearance-dispatch: failed to create: $pids_dir" >&2
+      exit 1
+    }
+    command chmod 700 -- "$cache_dir" "$pids_dir" 2>/dev/null || true
+
+    local tmp_file="$appearance_file.$$"
+    builtin print -r -- "$dark_mode" >| "$tmp_file" 2>/dev/null || {
+      print -r -- "appearance-dispatch: failed to write: $tmp_file" >&2
+      exit 1
+    }
+    command mv -f -- "$tmp_file" "$appearance_file" 2>/dev/null || {
+      command rm -f -- "$tmp_file" 2>/dev/null || true
+      print -r -- "appearance-dispatch: failed to update: $appearance_file" >&2
+      exit 1
+    }
+    command chmod 600 -- "$appearance_file" 2>/dev/null || true
+
+    local pid_file pid stored_start cur_start comm
+    for pid_file in "$pids_dir"/*; do
+      pid=${pid_file:t}
+      [[ $pid == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
+
+      IFS= read -r stored_start <"$pid_file" 2>/dev/null || stored_start=''
+      stored_start=${stored_start%%[[:space:]]##}
+
+      cur_start=$(command ps -p "$pid" -o lstart= 2>/dev/null) || cur_start=''
+      cur_start=${cur_start%%[[:space:]]##}
+
+      if [[ -z $cur_start || -z $stored_start || $cur_start != $stored_start ]]; then
+        command rm -f -- "$pid_file" 2>/dev/null || true
+        continue
+      fi
+
+      comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || comm=''
+      [[ $comm == *zsh* ]] || continue
+
+      command kill -USR1 "$pid" 2>/dev/null || {
+        command rm -f -- "$pid_file" 2>/dev/null || true
+      }
+    done
   ;;
 
   (*)

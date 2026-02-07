@@ -104,6 +104,12 @@ function _zac.init.config() {
 
   # enable_ssh_tmux: optionally install the ssh-tmux lazy stub.
   : ${_zac[cfg.enable_ssh_tmux]:=${ZAC_ENABLE_SSH_TMUX:-1}}
+
+  # cache.dir: base directory for non-tmux ground truth and pid registry.
+  # Defaults to XDG cache dir when available.
+  local cache_base
+  cache_base=${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/zac}
+  : ${_zac[cfg.cache_dir]:=$cache_base}
 }
 
 function _zac.init.state() {
@@ -138,6 +144,62 @@ function _zac.init.state() {
 
   # guard.trapusr1_wrapped: 1 if we installed a chained TRAPUSR1 handler.
   : ${_zac[guard.trapusr1_wrapped]:=0}
+
+  # guard.cache_inited: 1 once cache dirs + pid hooks are initialized.
+  : ${_zac[guard.cache_inited]:=0}
+}
+
+function _zac.cache.pid.register() {
+  # Register this shell PID for safe external signaling.
+  #
+  # This creates a file in: $cfg.cache_dir/pids/$$
+  # The file contains the process start time to avoid PID reuse hazards.
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+  builtin setopt extended_glob
+
+  local dir=${_zac[cfg.cache_dir]:-}
+  [[ -n $dir ]] || return 0
+
+  local pids_dir="$dir/pids"
+  command mkdir -p -- "$pids_dir" 2>/dev/null || return 0
+  command chmod 700 -- "$dir" "$pids_dir" 2>/dev/null || true
+
+  local lstart
+  lstart=$(command ps -p $$ -o lstart= 2>/dev/null) || lstart=''
+  [[ -n $lstart ]] || return 0
+  lstart=${lstart%%[[:space:]]##}
+
+  local pid_file="$pids_dir/$$"
+  umask 077
+  builtin print -r -- "$lstart" >| "$pid_file" 2>/dev/null || true
+}
+
+function _zac.cache.pid.unregister() {
+  # Best-effort: remove this shell's pid registration.
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+
+  local dir=${_zac[cfg.cache_dir]:-}
+  [[ -n $dir ]] || return 0
+
+  command rm -f -- "$dir/pids/$$" 2>/dev/null || true
+}
+
+function _zac.cache.init() {
+  # Initialize cache dirs and pid lifecycle hooks.
+  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
+
+  (( _zac[guard.cache_inited] )) && return 0
+  _zac[guard.cache_inited]=1
+
+  local dir=${_zac[cfg.cache_dir]:-}
+  [[ -n $dir ]] || return 0
+
+  _zac.cache.pid.register
+
+  # zshexit_functions is a special global hook array.
+  if (( ${zshexit_functions[(I)_zac.cache.pid.unregister]-0} == 0 )); then
+    zshexit_functions+=(_zac.cache.pid.unregister)
+  fi
 }
 
 function _zac.init.debug() {
