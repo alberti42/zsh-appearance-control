@@ -102,6 +102,9 @@ function _zac.init.config() {
 
   # debug.mode: enable debug FIFO logging.
   : ${_zac[cfg.debug_mode]:=${ZAC_DEBUG:-0}}
+
+  # enable_ssh_tmux: optionally install the ssh-tmux lazy stub.
+  : ${_zac[cfg.enable_ssh_tmux]:=${ZAC_ENABLE_SSH_TMUX:-1}}
 }
 
 function _zac.init.state() {
