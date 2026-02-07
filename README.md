@@ -1,6 +1,6 @@
 # zsh-appearance-control
 
-`zsh-appearance-control` is a small Zsh plugin that helps your shell “remember” whether you are in light mode or dark mode.
+`zsh-appearance-control` is a Zsh plugin that helps your shell “remember” whether you are in light mode or dark mode.
 
 If you use a theme, prompt, or other plugins that should look different in dark mode, this plugin gives you a simple, reliable switch you can build on.
 
@@ -9,6 +9,18 @@ It’s designed to be calm and predictable:
 - it does not constantly poll your system
 - it does not run heavy commands every time your prompt is drawn
 - it updates when something tells it “the appearance changed”
+
+## Is this plugin for you?
+
+This plugin is for people who like their terminal to feel coherent.
+
+If you switch your system between light and dark mode, you probably want more than just the terminal window to change: you want tmux to pick a matching theme, you want your prompt to adjust, and you may want tools like fzf to use different colors.
+
+The hard part is that your shell doesn’t automatically hear about OS appearance changes.
+So most setups end up either polling (slow and annoying) or having a handful of custom scripts that don’t quite agree.
+
+`zsh-appearance-control` gives you a clean place to store “dark or light?” and a simple way to react when it changes.
+You can wire it to your terminal’s appearance hooks (for example WezTerm), or you can change appearance manually with `zac`.
 
 ## How it works (in plain words)
 
