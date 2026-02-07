@@ -120,19 +120,16 @@ function _zac.init.state() {
   # needs_sync: 1 => hooks call _zac.sync at the next opportunity.
   : ${_zac[state.needs_sync]:=0}
 
-  # needs_init_propagate: 1 => propagate once after first prompt.
-  : ${_zac[state.needs_init_propagate]:=0}
-
-  # last_sync_changed: 1 if the last _zac.sync changed is_dark.
-  : ${_zac[state.last_sync_changed]:=0}
+  # needs_propagate: 1 => run _zac.propagate at the next safe opportunity.
+  # Set by _zac.sync (when is_dark changes) and by the first prompt after load.
+  : ${_zac[state.needs_propagate]:=0}
 
   # defer_propagate: while 1, _zac.propagate is a no-op.
   #
   # We defer propagation until the first prompt after plugin load to avoid:
   # - fighting other plugins/themes during their startup
   # - calling user callbacks before their dependencies exist
-  : ${_zac[state.defer_propagate]:=${_zac[state.logon]:-0}}
-  unset '_zac[state.logon]' 2>/dev/null
+  : ${_zac[state.defer_propagate]:=0}
 
   # debug.fifo: shared FIFO path used by the debug module.
   : ${_zac[debug.fifo]:=''}
@@ -174,8 +171,7 @@ function _zac.init.shell() {
 
   # Do not force a sync on init. Sync should be triggered explicitly (USR1 or
   # `zac sync`) to avoid prompt stalls.
-  _zac[state.needs_init_propagate]=0
-  _zac[state.last_sync_changed]=0
+  _zac[state.needs_propagate]=0
 
   if (( in_zle )); then
     # Rare: plugin sourced from a ZLE widget/hook.
@@ -269,6 +265,7 @@ function _zac.propagate() {
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   (( _zac[state.defer_propagate] )) && return
+  _zac[state.needs_propagate]=0
 
   _zac.debug.log "core | propagate | is_dark=${_zac[state.is_dark]:-}"
 
@@ -284,7 +281,7 @@ function _zac.sync() {
   # Sync cached is_dark with the external ground truth.
   #
   # Ground truth is queried via _zac.dark_mode.query_ground_truth (platform).
-  # If the value changes, we update the cache and set state.last_sync_changed.
+  # If the value changes, we update the cache and set state.needs_propagate=1.
   # Callers decide whether/when to propagate.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
@@ -300,11 +297,11 @@ function _zac.sync() {
   if [[ $old_mode != $is_dark ]]; then
     _zac[state.is_dark]=$is_dark
     changed=1
+    _zac[state.needs_propagate]=1
   fi
 
   _zac.debug.log "core | sync | changed=${changed}"
 
-  _zac[state.last_sync_changed]=$changed
   _zac[state.needs_sync]=0
 }
 
@@ -318,29 +315,20 @@ function _zac.precmd() {
     # First prompt is our "safe point": other prompt plugins/themes have
     # typically finished their startup work, so we can propagate without
     # immediately being overwritten.
-    _zac[state.needs_init_propagate]=1
+    _zac[state.needs_propagate]=1
   fi
 
   if (( _zac[state.needs_sync] )); then
     _zac.debug.log "core | precmd | needs_sync=1"
     _zac.sync
-
-    if (( _zac[state.last_sync_changed] )); then
-      _zac.propagate
-
-      if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
-        # Only meaningful if a sync happens while ZLE is active.
-        zle reset-prompt 2>/dev/null
-      fi
-    fi
   fi
 
-  if (( _zac[state.needs_init_propagate] )); then
-    _zac[state.needs_init_propagate]=0
-    if (( ! _zac[state.last_sync_changed] )); then
-      # Ensure prompt-dependent vars are initialized even if the first sync did
-      # not change the cached value.
-      _zac.propagate
+  if (( _zac[state.needs_propagate] )); then
+    _zac.propagate
+
+    if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
+      # Only meaningful if a propagate happens while ZLE is active.
+      zle reset-prompt 2>/dev/null
     fi
   fi
 }
@@ -352,13 +340,13 @@ function _zac.preexec() {
   if (( _zac[state.needs_sync] )); then
     _zac.debug.log "core | preexec | needs_sync=1"
     _zac.sync
+  fi
 
-    if (( _zac[state.last_sync_changed] )); then
-      _zac.propagate
+  if (( _zac[state.needs_propagate] )); then
+    _zac.propagate
 
-      if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
-        zle reset-prompt 2>/dev/null
-      fi
+    if (( _zac[cfg.on_change.redraw_prompt] )) && [[ -n ${ZLE_STATE-} ]]; then
+      zle reset-prompt 2>/dev/null
     fi
   fi
 }

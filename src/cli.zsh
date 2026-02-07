@@ -37,7 +37,7 @@ function zac() {
       _zac[state.needs_sync]=1
       _zac.sync
       local rc=$?
-      if (( rc == 0 )) && (( _zac[state.last_sync_changed] )); then
+      if (( rc == 0 )) && (( _zac[state.needs_propagate] )); then
         _zac.propagate
       fi
       return $rc
