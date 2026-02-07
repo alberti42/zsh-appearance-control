@@ -1,0 +1,67 @@
+#!/bin/zsh -f
+
+emulate -LR zsh
+
+# External dispatcher for appearance changes.
+#
+# This script is intended to be called by OS watchers (WezTerm, launchd, etc.).
+# It does not source the plugin and it runs with `-f` (no rc files).
+#
+# Behavior (tmux):
+# - Set tmux option @dark_appearance to the provided value (0/1)
+# - Signal shell panes (zsh) with USR1 so the plugin can sync on next hook
+
+function _usage() {
+  local _dispatch_script=$1
+  print -r -- "usage: $_dispatch_script <tmux> <on|off|1|0|true|false>" >&2
+}
+
+local type=${1:-}
+local mode=${2:-}
+
+if [[ -z $type || -z $mode ]]; then
+  _usage "${0:t}"
+  exit 1
+fi
+
+local dark_mode
+case $mode in
+  (1|on|true|enable|enabled)   dark_mode=1 ;;
+  (0|off|false|disable|disabled) dark_mode=0 ;;
+  (*)
+    print -r -- "appearance-dispatch: invalid mode: $mode" >&2
+    _usage "${0:t}"
+    exit 1
+  ;;
+esac
+
+case $type in
+  (tmux)
+    command -v tmux >/dev/null 2>&1 || {
+      print -r -- "appearance-dispatch: tmux not found" >&2
+      exit 1
+    }
+
+    command tmux set-option -gq @dark_appearance "$dark_mode" 2>/dev/null || true
+
+    local pid comm
+    command tmux list-panes -a -F '#{pane_pid}' 2>/dev/null |
+      while IFS= read -r pid; do
+        [[ $pid == <-> ]] || continue
+
+        comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || continue
+        [[ $comm == *zsh ]] || continue
+
+        command kill -USR1 "$pid" 2>/dev/null || true
+      done
+  ;;
+
+  (*)
+    # TODO: define a convention for non-tmux propagation (cache file, etc.).
+    print -r -- "appearance-dispatch: unsupported type: $type" >&2
+    _usage "${0:t}"
+    exit 1
+  ;;
+esac
+
+exit 0
