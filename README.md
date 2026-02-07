@@ -15,7 +15,7 @@ If you use tmux, it integrates especially smoothly: tmux can hold the shared fla
 
 This README also includes minimal, working examples of what that enables:
 
-- tmux theme switching
+- tmux theme switching — see [tmux](#tmux-theme-switching-with-dark_appearance)
 - Neovim auto theme switching (by watching the appearance file) — see [Neovim](#neovim-switch-running-instances-on-change)
 - Emacs auto theme switching (by watching the appearance file) — see [Emacs](#emacs-auto-switch-catppuccin-flavour)
 
@@ -224,7 +224,7 @@ end)
 
 If you already know you only use tmux (or only use non-tmux shells), you can remove the dispatch you do not need.
 
-## Example: tmux theme switching with @dark_appearance
+## tmux: theme switching with @dark_appearance
 
 tmux is a great place to keep a single “appearance flag” that all panes can share.
 
