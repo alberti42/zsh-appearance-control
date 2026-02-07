@@ -15,7 +15,7 @@ It’s designed to be calm and predictable:
 Your terminal (or a tiny helper you run) notices when the system appearance changes.
 It then nudges your shells.
 
-Inside each shell, the plugin keeps a small cached value (`0` or `1`) and runs your callback (optional) to update your prompt.
+Inside each shell, the plugin keeps a small cached value (`0` or `1`) and runs your callback (optional) so you can adjust your shell environment.
 
 There are two “places” the plugin can read from:
 
@@ -46,7 +46,7 @@ The plugin provides a `zac` command:
 On macOS, switching is done via the system appearance setting.
 On Linux, GNOME is supported via the GNOME setting.
 
-### If you want your prompt to react
+### If you want your shell to react
 
 You can provide a callback function name via an environment variable.
 When the cached value changes, the plugin will call your function with one argument:
@@ -54,7 +54,22 @@ When the cached value changes, the plugin will call your function with one argum
 - `1` for dark
 - `0` for light
 
-Example idea (keep it simple): export a few variables your theme reads.
+Example idea: export a few variables your theme reads. Here is a minimal example that tweaks fzf colors depending on appearance:
+
+```zsh
+my_zac_callback() {
+  local is_dark=$1
+
+  if (( is_dark )); then
+    export FZF_DEFAULT_OPTS='--color=bg+:#1f2430,fg:#c8d3f5,hl:#82aaff'
+  else
+    export FZF_DEFAULT_OPTS='--color=bg+:#f2f2f2,fg:#2d2a2e,hl:#005f87'
+  fi
+}
+
+# Export this variable before loading zsh-appearance-control
+export ZAC_CALLBACK_FNC=my_zac_callback
+```
 
 ## Connecting it to your terminal (the “watcher”)
 
@@ -92,12 +107,19 @@ This shows a live log stream while you trigger appearance changes.
 ## Optional extra: ssh-tmux
 
 If enabled (default), this plugin also provides `ssh-tmux`.
-It connects over SSH and makes sure the remote tmux session has `@dark_appearance` set.
+
+It works like `ssh` (same arguments), but it automatically attaches to a remote tmux session and makes sure the session has `@dark_appearance` set.
 
 You can disable it by setting:
 
 ```zsh
 export ZAC_ENABLE_SSH_TMUX=0
+```
+
+You can customize the remote tmux session name (default: `main`):
+
+```zsh
+export ZAC_SSH_TMUX_SESSION=main
 ```
 
 ## Configuration
@@ -119,3 +141,35 @@ If your terminal does not offer hooks, you can still use this plugin:
 
 - switch manually with `zac dark/light/toggle`, or
 - write a small watcher script/service that calls `bin/appearance-dispatch` when your system appearance changes.
+
+### Example: WezTerm appearance hook
+
+WezTerm can run a command when the system appearance changes. Here is a sketch you can adapt:
+
+```lua
+local wezterm = require 'wezterm'
+
+local home = os.getenv('HOME')
+local zac_dispatcher = home .. '/path/to/zsh-appearance-control/bin/appearance-dispatch'
+
+local function scheme_for_appearance(appearance)
+  local is_dark = appearance:find('Dark') ~= nil
+  local dark = is_dark and '1' or '0'
+
+  -- Choose where to dispatch:
+  -- - "tmux"  keeps tmux @dark_appearance updated
+  -- - "cache" updates a small cache file for non-tmux shells
+  wezterm.run_child_process({ zac_dispatcher, 'tmux', dark })
+  wezterm.run_child_process({ zac_dispatcher, 'cache', dark })
+
+  return is_dark and 'My Dark Scheme' or 'My Light Scheme'
+end
+
+wezterm.on('window-config-reloaded', function(window, pane)
+  local overrides = window:get_config_overrides() or {}
+  overrides.color_scheme = scheme_for_appearance(window:get_appearance())
+  window:set_config_overrides(overrides)
+end)
+```
+
+If you already know you only use tmux (or only use non-tmux shells), you can remove the dispatch you do not need.

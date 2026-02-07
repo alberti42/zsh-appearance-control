@@ -19,9 +19,11 @@ function ssh-tmux() {
     (*) dark_mode=0 ;;
   esac
 
+  local session=${_zac[cfg.ssh_tmux_session]:-main}
+
   # Pass the appearance to the remote tmux session.
   # Note: use `\\;` so the remote shell receives a literal `\;`.
-  command ssh -t "$@" "tmux new-session -A -s main \\; set-option -gq @dark_appearance ${dark_mode}"
+  command ssh -t "$@" "tmux new-session -A -s ${session} \\; set-option -gq @dark_appearance ${dark_mode}"
 }
 
 # Enforce the same autocompletion for ssh-tmux as for ssh (when available).

@@ -105,6 +105,9 @@ function _zac.init.config() {
   # enable_ssh_tmux: optionally install the ssh-tmux lazy stub.
   : ${_zac[cfg.enable_ssh_tmux]:=${ZAC_ENABLE_SSH_TMUX:-1}}
 
+  # ssh_tmux.session: remote tmux session name used by ssh-tmux.
+  : ${_zac[cfg.ssh_tmux_session]:=${ZAC_SSH_TMUX_SESSION:-main}}
+
   # linux.desktop: enable desktop-specific OS setters on Linux.
   #
   # Values:
