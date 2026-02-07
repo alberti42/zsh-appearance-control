@@ -241,6 +241,107 @@ This repo includes a complete example you can copy and adapt:
 
 - `examples/tmux/catppuccin.conf`
 
+## Neovim: switch running instances on change
+
+If you want Neovim to react to the same appearance changes as your shells, a great approach is to watch a file and react when it changes.
+
+Henrik Sommerfeld has a nice write-up of that file-watching technique for Neovim:
+
+- https://www.henriksommerfeld.se/neovim-automatic-light-dark-mode-switcher/
+
+`zsh-appearance-control` helps by providing a shared, simple “dark or light?” flag that other tools can consume.
+Instead of inventing your own `~/.theme` convention, you can reuse the plugin’s cache file:
+
+- `ZAC_CACHE_DIR/appearance` (default: `~/.cache/zac/appearance`)
+
+That file contains a single character:
+
+- `1` for dark
+- `0` for light
+
+Your watcher updates it by calling `bin/appearance-dispatch cache ...`, and then your shells (and Neovim) can react.
+
+Here is a minimal sketch (inspired by the same mechanics Henrik describes) that watches the file and switches Neovim’s background:
+
+This uses Neovim’s built-in file watching (libuv via `vim.uv`), so you do not need to install any extra Neovim plugin.
+If you are on an older Neovim version that does not have `vim.uv`, try replacing it with `vim.loop`.
+
+### Where do I put this?
+
+If you are new to Neovim config, a simple way to try this is:
+
+1) Create a file named `auto-color-scheme.lua` in your Neovim config directory.
+
+On most systems, that directory is:
+
+- `~/.config/nvim/`
+
+So the full path would be:
+
+- `~/.config/nvim/auto-color-scheme.lua`
+
+2) Paste the Lua code below into that file.
+
+3) In your `init.lua`, load it with:
+
+```lua
+-- Load auto-color-scheme:
+-- watches ZAC_CACHE_DIR/appearance (0/1) and switches colorscheme live.
+dofile(vim.fn.stdpath("config") .. "/auto-color-scheme.lua")
+```
+
+```lua
+local uv = vim.uv
+
+local function zac_appearance_file()
+  local cache = os.getenv("ZAC_CACHE_DIR")
+  if not cache or cache == "" then
+    cache = (os.getenv("XDG_CACHE_HOME") or (os.getenv("HOME") .. "/.cache")) .. "/zac"
+  end
+  return cache .. "/appearance"
+end
+
+local function read_mode(path)
+  local f = io.open(path, "r")
+  if not f then
+    return "0"
+  end
+  local line = f:read("*line") or "0"
+  f:close()
+  return line
+end
+
+local function apply_mode(mode)
+  if mode == '1' then
+    vim.o.background = 'dark'
+    pcall(vim.cmd.colorscheme, 'catppuccin-macchiato')
+  else
+    vim.o.background = 'light'
+    pcall(vim.cmd.colorscheme, 'catppuccin-frappe')
+  end
+end
+
+local path = zac_appearance_file()
+
+-- Apply once on startup.
+vim.schedule(function()
+  apply_mode(read_mode(path))
+end)
+
+-- Watch for changes.
+local handle = uv.new_fs_event()
+if handle then
+  uv.fs_event_start(handle, path, {}, function(err)
+    if err then
+      return
+    end
+    vim.schedule(function()
+      apply_mode(read_mode(path))
+    end)
+  end)
+end
+```
+
 ## Author
 - **Author:** Andrea Alberti
 - **GitHub Profile:** [alberti42](https://github.com/alberti42)
