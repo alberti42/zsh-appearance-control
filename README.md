@@ -36,9 +36,32 @@ There are two “places” the plugin can read from:
 
 ## Install
 
-Install it with your plugin manager the same way you install other Zsh plugins.
+However you install it, set any `ZAC_*` environment variables *before* the plugin is loaded (usually in your `.zshrc`, above the plugin line).
 
-After installation, restart your terminal or reload your shell.
+### Oh My Zsh
+
+Clone this repo into your Oh My Zsh custom plugins directory:
+
+```zsh
+git clone https://github.com/alberti42/zsh-appearance-control.git \
+  "$ZSH_CUSTOM/plugins/zsh-appearance-control"
+```
+
+Then add it to your plugins list in `.zshrc`:
+
+```zsh
+plugins=(... zsh-appearance-control)
+```
+
+### DIY (no plugin manager)
+
+Clone the repo anywhere you like, then source the entry file from `.zshrc`:
+
+```zsh
+source "/path/to/zsh-appearance-control/zsh-appearance-control.plugin.zsh"
+```
+
+After installing, restart your terminal (or start a new shell).
 
 ## Everyday use
 
@@ -213,3 +236,14 @@ set-option -g @dark_appearance 0
 This repo includes a complete example you can copy and adapt:
 
 - `examples/tmux/catppuccin.conf`
+
+## Author
+- **Author:** Andrea Alberti
+- **GitHub Profile:** [alberti42](https://github.com/alberti42)
+- **Donations:** [![Buy Me a Coffee](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-orange)](https://buymeacoffee.com/alberti)
+
+Feel free to contribute to the development of this plugin or report any issues in the [GitHub repository](https://github.com/alberti42/zsh-appearance-control/issues).
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
