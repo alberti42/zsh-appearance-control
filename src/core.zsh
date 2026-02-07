@@ -1,7 +1,7 @@
 # Core runtime for zsh-appearance-control.
 #
 # This file implements:
-# - the state machine for "needs_sync" and "logon" handling
+# - the state machine for "needs_sync" and deferred propagation
 # - the sync path that reads ground truth and updates cached is_dark
 # - the propagation path that updates prompt-related variables / callback
 #
@@ -126,8 +126,13 @@ function _zac.init.state() {
   # last_sync_changed: 1 if the last _zac.sync changed is_dark.
   : ${_zac[state.last_sync_changed]:=0}
 
-  # logon: while 1, _zac.propagate avoids touching other plugins.
-  : ${_zac[state.logon]:=0}
+  # defer_propagate: while 1, _zac.propagate is a no-op.
+  #
+  # We defer propagation until the first prompt after plugin load to avoid:
+  # - fighting other plugins/themes during their startup
+  # - calling user callbacks before their dependencies exist
+  : ${_zac[state.defer_propagate]:=${_zac[state.logon]:-0}}
+  unset '_zac[state.logon]' 2>/dev/null
 
   # debug.fifo: shared FIFO path used by the debug module.
   : ${_zac[debug.fifo]:=''}
@@ -154,7 +159,7 @@ function _zac.init.debug() {
 }
 
 function _zac.init.shell() {
-  # Per-shell startup initialization.
+  # Per-shell initialization.
   #
   # Must not query external state.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
@@ -162,6 +167,8 @@ function _zac.init.shell() {
   (( ${+_zac[guard.shell_inited]} )) && return 0
   _zac[guard.shell_inited]=1
 
+  # ZLE_STATE is set only while the ZLE line editor is active (widgets/hooks).
+  # It is typically empty while executing a command like: `source ...`.
   local in_zle=0
   [[ -n ${ZLE_STATE-} ]] && in_zle=1
 
@@ -171,11 +178,14 @@ function _zac.init.shell() {
   _zac[state.last_sync_changed]=0
 
   if (( in_zle )); then
-    # If sourced while editing a command line, allow propagation immediately.
-    _zac[state.logon]=0
+    # Rare: plugin sourced from a ZLE widget/hook.
+    # Allow immediate propagation + prompt redraw (if configured).
+    _zac[state.defer_propagate]=0
   else
-    # During shell startup, keep logon=1 until the first prompt.
-    _zac[state.logon]=1
+    # Common: shell startup (or manual `source` from a normal prompt).
+    # Defer propagation until the next prompt to avoid fighting other plugins
+    # and to avoid calling user callbacks too early.
+    _zac[state.defer_propagate]=1
   fi
 }
 
@@ -185,7 +195,7 @@ function _zac.init() {
   # Responsibilities:
   # - Initialize config (env) + internal defaults
   # - Initialize debug (if enabled)
-  # - Initialize runtime flags (logon, etc.)
+  # - Initialize runtime flags (defer_propagate, etc.)
   # - Register zsh integration points (hooks + TRAPUSR1)
   #
   # Non-responsibilities:
@@ -258,7 +268,7 @@ function _zac.propagate() {
   # from hooks. It does not query tmux/OS.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
-  (( _zac[state.logon] )) && return
+  (( _zac[state.defer_propagate] )) && return
 
   _zac.debug.log "core | propagate | is_dark=${_zac[state.is_dark]:-}"
 
@@ -300,11 +310,14 @@ function _zac.sync() {
 
 function _zac.precmd() {
   # precmd hook: runs right before the prompt is shown.
-  # Used to perform deferred sync work and to perform one-time post-logon
-  # propagation.
-  if (( _zac[state.logon] )); then
+  # Used to perform deferred sync work and to perform one-time propagation
+  # after the initial defer window.
+  if (( _zac[state.defer_propagate] )); then
     _zac.debug.log "core | precmd | first prompt"
-    _zac[state.logon]=0
+    _zac[state.defer_propagate]=0
+    # First prompt is our "safe point": other prompt plugins/themes have
+    # typically finished their startup work, so we can propagate without
+    # immediately being overwritten.
     _zac[state.needs_init_propagate]=1
   fi
 
