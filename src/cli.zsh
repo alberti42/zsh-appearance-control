@@ -15,7 +15,7 @@ function zac() {
 
   case $cmd in
     (-h|--help|help)
-      print -r -- "usage: zac <status|sync|toggle|dark|light|callback|debug>"
+      print -r -- "usage: zac <status|sync|toggle|dark|light|debug>"
       return 0
     ;;
 
@@ -35,29 +35,6 @@ function zac() {
       _zac[state.needs_sync]=1
       _zac.sync
       return $?
-    ;;
-
-    (callback)
-      # Get/set the callback function name.
-      # The callback is called by _zac.propagate as: $callback <is_dark>.
-      if (( $# == 0 )); then
-        local cb=${_zac[cfg.callback_fnc]:-}
-        if [[ -n $cb ]]; then
-          print -r -- "$cb"
-        else
-          print -r -- "--no callback function set--"
-        fi
-        return 0
-      fi
-
-      if [[ $1 == '-' ]]; then
-        # Disable callback.
-        _zac[cfg.callback_fnc]=''
-        return 0
-      fi
-
-      _zac[cfg.callback_fnc]="$1"
-      return 0
     ;;
 
     (debug)
