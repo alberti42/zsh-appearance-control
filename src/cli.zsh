@@ -9,6 +9,9 @@
 
 function zac() {
   # CLI dispatcher.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   _zac.debug.log "cli | zac $*"
   local cmd=${1:-status}
   shift $(( $# > 0 ? 1 : 0 ))
@@ -78,6 +81,9 @@ function zac() {
 
 function _zac.cli.init() {
   # CLI module init (idempotent).
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   (( ${+_zac[guard.cli_inited]} )) && return 0
   _zac[guard.cli_inited]=1
 }

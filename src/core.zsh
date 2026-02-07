@@ -25,12 +25,18 @@ typeset -gA _zac
 # However, the user-facing `zac debug ...` command should work even when debug
 # is disabled by default.
 function _zac.debug.controller() {
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   _zac.module.compile_and_source src/debug.zsh || return $?
   _zac.debug.controller "$@"
 }
 
 function _zac.module.compile() {
   # Compile a script to a .zwc if ZAC_COMPILE=1 and the .zwc is missing/stale.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   local script=$1
   local compile=${ZAC_COMPILE:-1}
 
@@ -47,6 +53,9 @@ function _zac.module.compile() {
 
 function _zac.module.compile_and_source() {
   # Compile (optional) and source a plugin module by workspace-relative path.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   local module=$1
 
   local dir=${_zac[meta.plugin_dir]:-}
@@ -81,6 +90,8 @@ _zac.module.compile "${${(%):-%x}:a}"
 function _zac.init.config() {
   # Read user configuration from env vars.
   # This is the only place that reads ZAC_* env vars.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
 
   # callback.fnc: optional function name called as: $callback <is_dark>
   : ${_zac[cfg.callback_fnc]:=''}
@@ -98,6 +109,8 @@ function _zac.init.config() {
 
 function _zac.init.state() {
   # Initialize internal state keys (do not read external ground truth here).
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
 
   # is_dark: cached boolean (0/1). May be empty until first sync or zac command.
   : ${_zac[state.is_dark]:=''}
@@ -129,6 +142,9 @@ function _zac.init.state() {
 
 function _zac.init.debug() {
   # Load and initialize debug module if enabled.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   (( _zac[cfg.debug_mode] )) || return 0
 
   if (( $+functions[_zac.debug.init] == 0 )); then
@@ -140,6 +156,9 @@ function _zac.init.shell() {
   # Per-shell startup initialization.
   #
   # Must not query external state.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   (( ${+_zac[guard.shell_inited]} )) && return 0
   _zac[guard.shell_inited]=1
 
@@ -171,6 +190,13 @@ function _zac.init() {
   #
   # Non-responsibilities:
   # - No external queries (tmux/OS) and no sync.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
+  # These are special global hook arrays in zsh.
+  # Declare them explicitly to avoid `warn_create_global` noise.
+  typeset -ga precmd_functions preexec_functions
+
   (( ${+_zac[guard.core_inited]} )) && return 0
   _zac[guard.core_inited]=1
 
@@ -181,12 +207,12 @@ function _zac.init() {
 
   _zac.debug.log "init | begin"
 
-  if (( ${precmd_functions[(I)_zac.precmd]} == 0 )); then
+  if (( ${precmd_functions[(I)_zac.precmd]-0} == 0 )); then
     _zac.debug.log "init | hook precmd"
     precmd_functions+=(_zac.precmd)
   fi
 
-  if (( ${preexec_functions[(I)_zac.preexec]} == 0 )); then
+  if (( ${preexec_functions[(I)_zac.preexec]-0} == 0 )); then
     _zac.debug.log "init | hook preexec"
     preexec_functions+=(_zac.preexec)
   fi

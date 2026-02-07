@@ -23,6 +23,9 @@ function _zac.debug.ts() {
 
 function _zac.debug.init() {
   # Create (if needed) the shared FIFO.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   #
   # Side effects:
   # - sets _zac[debug.fifo] to FIFO path
@@ -89,6 +92,9 @@ function _zac.debug.log() {
 function _zac.debug.console.follow() {
   # Follow the debug FIFO and print lines to the terminal.
   # This blocks; stop with Ctrl-C.
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   local fifo=${_zac[debug.fifo]:-}
   if [[ -z $fifo ]]; then
     print -r -- "zac debug console: debug fifo is not initialized" >&2
@@ -113,6 +119,9 @@ function _zac.debug.controller() {
   #
   # Usage:
   #   zac debug on|off|status|console
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   local sub=${1:-status}
   shift $(( $# > 0 ? 1 : 0 ))
 
@@ -170,6 +179,9 @@ function _zac.debug.controller() {
 
 function _zac.debug.module_init() {
   # Debug module init (idempotent).
+  builtin emulate -LR zsh
+  builtin setopt warn_create_global no_short_loops
+
   (( ${+_zac[guard.debug_module_inited]} )) && return 0
   _zac[guard.debug_module_inited]=1
 

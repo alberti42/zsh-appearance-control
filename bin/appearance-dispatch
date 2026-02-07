@@ -1,6 +1,7 @@
 #!/bin/zsh -f
 
 emulate -LR zsh
+builtin setopt warn_create_global no_short_loops
 
 # External dispatcher for appearance changes.
 #
