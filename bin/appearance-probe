@@ -12,14 +12,14 @@ emulate -LR zsh -o warn_create_global -o no_short_loops
 #   appearance-probe tmux  # prints 1/0 from tmux @dark_appearance
 
 function _usage() {
-  print -r -- "usage: ${0:t} <os|tmux>" >&2
+  print -r -- "usage: $1 <os|tmux>" >&2
 }
 
 local type=${1:-}
 
 case $type in
   (-h|--help|help|'')
-    _usage
+    _usage "${0:t}"
     exit 2
   ;;
 esac
@@ -65,7 +65,7 @@ case $type in
 
   (*)
     print -r -- "appearance-probe: unsupported type: $type" >&2
-    _usage
+    _usage "${0:t}"
     exit 2
   ;;
 esac
