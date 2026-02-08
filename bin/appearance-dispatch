@@ -83,6 +83,7 @@ case $type in
     local cache_dir=${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/zac}
     local pids_dir="$cache_dir/pids"
     local appearance_file="$cache_dir/appearance"
+    local atomic=${ZAC_CACHE_ATOMIC:-0}
 
     command mkdir -p -- "$pids_dir" 2>/dev/null || {
       print -r -- "appearance-dispatch: failed to create: $pids_dir" >&2
@@ -90,16 +91,31 @@ case $type in
     }
     command chmod 700 -- "$cache_dir" "$pids_dir" 2>/dev/null || true
 
-    local tmp_file="$appearance_file.$$"
-    builtin print -r -- "$dark_mode" >| "$tmp_file" 2>/dev/null || {
-      print -r -- "appearance-dispatch: failed to write: $tmp_file" >&2
-      exit 1
-    }
-    command mv -f -- "$tmp_file" "$appearance_file" 2>/dev/null || {
-      command rm -f -- "$tmp_file" 2>/dev/null || true
-      print -r -- "appearance-dispatch: failed to update: $appearance_file" >&2
-      exit 1
-    }
+    if (( atomic )); then
+      # Atomic update: write temp file then rename into place.
+      # Ensures readers see a complete value (old or new, never partial),
+      # but replaces the file inode on each update.
+      # Tools that watch for changes (e.g. Emacs/Neovim configs) must watch the
+      # directory, not the file itself.
+      local tmp_file="$appearance_file.$$"
+      builtin print -r -- "$dark_mode" >| "$tmp_file" 2>/dev/null || {
+        print -r -- "appearance-dispatch: failed to write: $tmp_file" >&2
+        exit 1
+      }
+      command mv -f -- "$tmp_file" "$appearance_file" 2>/dev/null || {
+        command rm -f -- "$tmp_file" 2>/dev/null || true
+        print -r -- "appearance-dispatch: failed to update: $appearance_file" >&2
+        exit 1
+      }
+    else
+      # In-place update: keep inode stable.
+      # For this plugin a one-byte flag file is enough; readers should treat anything
+      # other than "0" or "1" as transient (i.e.,invalid) and retry.
+      builtin print -r -- "$dark_mode" >| "$appearance_file" 2>/dev/null || {
+        print -r -- "appearance-dispatch: failed to write: $appearance_file" >&2
+        exit 1
+      }
+    fi
     command chmod 600 -- "$appearance_file" 2>/dev/null || true
 
     local pid_file pid stored_start cur_start comm

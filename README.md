@@ -138,6 +138,17 @@ Which one should you use?
 
 The dispatcher is careful about signaling: in `cache` mode it only signals shell processes that have opted in (shells that loaded this plugin), so it avoids accidentally sending signals to unrelated shells.
 
+<details>
+<summary><strong>TL;DR: cache updates (in-place vs atomic)</strong></summary>
+
+In `cache` mode the appearance file is updated “in place” by default. In plain words: we overwrite the contents of the same file, so it stays the same file on disk. This keeps file watchers simple.
+
+If you set `ZAC_CACHE_ATOMIC=1`, updates become “atomic”: the dispatcher writes a temporary file and then swaps it into place. This is more crash-proof, but given the tiny size of the `0/1` flag a read/write race is extremely unlikely (dark mode changes and your TUI reads the flag in that split-second). Choose atomic mode if you want peace of mind that shell scripts always read a valid value.
+
+There is a tradeoff: because atomic mode replaces the file each time (the inode changes), tools that watch files (like editor configs) must watch the directory rather than the file itself.
+
+</details>
+
 ## Debugging
 
 If you want to see what the plugin is doing, you can turn on debug logging:
@@ -326,9 +337,11 @@ local function apply_mode(mode)
   if mode == '1' then
     vim.o.background = 'dark'
     pcall(vim.cmd.colorscheme, 'catppuccin-macchiato')
+    -- vim.notify("Switching to dark mode 🌘")
   else
     vim.o.background = 'light'
     pcall(vim.cmd.colorscheme, 'catppuccin-frappe')
+    -- vim.notify("Switching to light mode 🌖")
   end
 end
 
