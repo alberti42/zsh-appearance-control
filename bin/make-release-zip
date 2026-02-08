@@ -14,13 +14,13 @@ setopt errexit nounset pipefail
 # - logo/ (README references it)
 
 function _usage() {
-  print -r -- "usage: ${0:t} <version-tag>" >&2
-  print -r -- "example: ${0:t} v0.1.0" >&2
+  print -r -- "usage: $1 <version-tag>" >&2
+  print -r -- "example: $1 v0.1.0" >&2
 }
 
 local version=${1:-}
 if [[ -z $version ]]; then
-  _usage
+  _usage "${0:t}"
   exit 2
 fi
 
