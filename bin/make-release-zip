@@ -67,6 +67,7 @@ command rsync -a --delete \
   --exclude '.DS_Store' \
   --exclude '*.zwc' \
   --exclude '*.ai' \
+  --exclude 'bin/make-release-zip' \
   -- ${paths[@]} "$stage/"
 
 command rm -f -- "$zip_path" 2>/dev/null || true
