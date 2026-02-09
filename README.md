@@ -1,4 +1,4 @@
-# zsh-appearance-control
+# zac (zsh-appearance-control)
 
 <p align="center">
   <img src="logo/logo-zsh-appearance-control.png" alt="zsh-appearance-control logo" width="250" />
