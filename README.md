@@ -211,17 +211,28 @@ WezTerm can run a command when the system appearance changes. Here is a sketch y
 local wezterm = require 'wezterm'
 
 local home = os.getenv('HOME')
-local zac_dispatcher = home .. '/path/to/zsh-appearance-control/bin/appearance-dispatch'
 
 local function scheme_for_appearance(appearance)
+  local zac_dispatcher = home .. '/path/to/zsh-appearance-control/bin/appearance-dispatch'
+
+  -- WezTerm is a GUI app and does not inherit the login-shell PATH.
+  -- Tools called by appearance-dispatch (such as tmux) may not be found
+  -- unless you explicitly extend PATH here.
+  -- Common directories to add:
+  --   macOS Homebrew (Apple Silicon): /opt/homebrew/bin
+  --   macOS Homebrew (Intel):         /usr/local/bin
+  --   zinit polaris:                  home .. '/.local/share/zinit/polaris/bin'
+  local tmux_dir = '/opt/homebrew/bin'  -- adjust to match where tmux lives on your system
+  local env_path  = tmux_dir .. ':' .. os.getenv('PATH')
+
   local is_dark = appearance:find('Dark') ~= nil
   local dark = is_dark and '1' or '0'
 
   -- Choose where to dispatch:
   -- - "tmux"  keeps tmux @dark_appearance updated
   -- - "cache" updates a small cache file for non-tmux shells
-  wezterm.run_child_process({ zac_dispatcher, 'tmux', dark })
-  wezterm.run_child_process({ zac_dispatcher, 'cache', dark })
+  wezterm.run_child_process({ 'env', 'PATH=' .. env_path, zac_dispatcher, 'tmux', dark })
+  wezterm.run_child_process({ 'env', 'PATH=' .. env_path, zac_dispatcher, 'cache', dark })
 
   return is_dark and 'My Dark Scheme' or 'My Light Scheme'
 end
