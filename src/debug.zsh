@@ -10,7 +10,7 @@
 #   we only open the FIFO for writing in non-blocking mode; if no reader is
 #   attached, logging is dropped.
 
-function _zac.debug.ts() {
+function _zac.debug.timestamp() {
   # Format a timestamp into REPLY.
   # Uses zsh/datetime when available.
   local ts
@@ -51,8 +51,11 @@ function _zac.debug.init() {
 
   _zac[debug.fifo]=$fifo
 
-  _zac.debug.ts
-  _zac[debug.start_ts]=$REPLY
+  local _debug_saved_reply=$REPLY
+  _zac.debug.timestamp
+  local ts=$REPLY
+  REPLY=$_debug_saved_reply
+  _zac[debug.start_ts]="${ts}"
 
   # Best-effort: log an init marker if a reader is already attached.
   _zac.debug.log "zac debug init | fifo=${fifo}"
@@ -80,8 +83,14 @@ function _zac.debug.log() {
     [[ -n $start_ts ]] && builtin print -r -- >&$fd "${start_ts} | zac debug start"
   fi
 
-  _zac.debug.ts
-  { builtin print -r -- >&$fd "${REPLY} | $*" } 2>/dev/null || {
+  # We need to save the current value of $REPLY
+  # because otherwise _zac.debug.timestamp compromises its
+  # value. After retrieving the timestamp, we restore $REPLY
+  local _debug_saved_reply=$REPLY
+  _zac.debug.timestamp
+  local ts=$REPLY
+  REPLY=$_debug_saved_reply
+  { builtin print -r -- >&$fd "${ts} | $*" } 2>/dev/null || {
     # Broken pipe / reader went away.
     exec {fd}>&-
     _zac[debug.fd]=''
