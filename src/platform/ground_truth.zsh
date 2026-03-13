@@ -21,12 +21,12 @@ function _zac.dark_mode.query_ground_truth() {
   if [[ -n $dir && -f $file ]]; then
     IFS= read -r v <"$file" 2>/dev/null || v=''
     case $v in
-      (1) REPLY=1; return 0 ;;
-      (0) REPLY=0; return 0 ;;
+      (1) typeset -g REPLY=1; return 0 ;;
+      (0) typeset -g REPLY=0; return 0 ;;
     esac
   fi
 
   # Unknown.
-  REPLY=''
+  typeset -g REPLY=''
   return 1
 }
