@@ -26,13 +26,16 @@ function zac() {
       #
       # Contract:
       # - Always prints 1 (dark) or 0 (light/unknown fallback)
+      # - Stores the same result in $REPLY for quick retrieval
       # - Returns 0 when known, 1 when unknown
       if (( ${+_zac[state.is_dark]} )) && [[ -n ${_zac[state.is_dark]} ]]; then
         print -r -- ${_zac[state.is_dark]}
+        REPLY=${_zac[state.is_dark]}
         return 0
       fi
 
       print -r -- 0
+      REPLY=0
       return 1
     ;;
 
