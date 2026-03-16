@@ -98,16 +98,29 @@ On Linux, GNOME is supported via the GNOME setting.
 
 ### If you want your shell to react
 
-The plugin provides two callback hooks with different timing guarantees. Both receive one argument: `1` for dark, `0` for light.
+The plugin gives you three hooks. The right one depends on what you are trying to do.
 
-**`ZAC_IMMEDIATE_CALLBACK_FNC`** — called directly inside the signal handler, before the next prompt redraws. Use this for lightweight, instant updates: `export`, `typeset`, `zstyle`, and `source` of files that only contain variable assignments. No I/O, no subshells, no external commands.
+| Hook | Runs | Use for |
+|---|---|---|
+| `ZAC_IO_CMD` | Once, in the dispatcher, before shells are signaled | Writing config files to disk |
+| `ZAC_IMMEDIATE_CALLBACK_FNC` | In every shell, immediately on signal | Updating env vars and shell settings |
+| `ZAC_DEFERRED_CALLBACK_FNC` | In every shell, at the next prompt | Prompt redraws, anything heavier |
 
-**`ZAC_DEFERRED_CALLBACK_FNC`** — called at the next `precmd`/`preexec` boundary. Safe for anything: prompt redraws, plugin reconfiguration, external tool calls.
+**`ZAC_IO_CMD`** is an executable path, not a shell function. The dispatcher runs it once per appearance change (under a lock, idempotent) before signaling any shell. Use it for anything that writes to files on disk: tool config files, theme files, JSON settings. By the time shells receive the signal, the files are already updated. If it exits with a non-zero status the entire pipeline is aborted — no shells are signaled.
 
-A minimal example using the deferred callback to tweak fzf colors:
+Must be a single executable path. If you need to pass arguments or set environment variables, write a small wrapper script. Use `#!/bin/zsh` (without `-f`) as the shebang so that your `.zshenv` is sourced automatically and your usual environment variables are available.
 
 ```zsh
-my_zac_callback() {
+export ZAC_IO_CMD=/path/to/your/io-script
+```
+
+**`ZAC_IMMEDIATE_CALLBACK_FNC`** is a shell function called directly inside the signal handler in every shell, before the next prompt redraws. Use it for lightweight, instant in-shell updates.
+
+Allowed: `export`, `typeset`, `zstyle`, and `source` of files that only contain variable assignments.
+Not allowed: I/O, subshells, pipes, or external commands — these can hang or corrupt shell state inside a signal handler.
+
+```zsh
+my_immediate_callback() {
   local is_dark=$1
 
   if (( is_dark )); then
@@ -117,8 +130,18 @@ my_zac_callback() {
   fi
 }
 
-# Export this variable before loading zsh-appearance-control
-export ZAC_DEFERRED_CALLBACK_FNC=my_zac_callback
+export ZAC_IMMEDIATE_CALLBACK_FNC=my_immediate_callback
+```
+
+**`ZAC_DEFERRED_CALLBACK_FNC`** is a shell function called at the next `precmd`/`preexec` boundary in every shell. Safe for anything: prompt redraws, plugin reconfiguration, external tool calls. Use it when you need to do something heavier in-shell that can wait until the next prompt.
+
+```zsh
+my_deferred_callback() {
+  local is_dark=$1
+  # safe to call external tools, redraw prompt, etc.
+}
+
+export ZAC_DEFERRED_CALLBACK_FNC=my_deferred_callback
 ```
 
 ## Connecting it to your terminal (the “watcher”)
@@ -126,24 +149,47 @@ export ZAC_DEFERRED_CALLBACK_FNC=my_zac_callback
 The plugin does not try to guess when your system appearance changes.
 Instead, you (or your terminal) call a tiny helper script when the appearance changes.
 
-This repo ships a standalone dispatcher:
+This repo ships a standalone dispatcher: `bin/appearance-dispatch`.
 
-- `bin/appearance-dispatch tmux <on|off|1|0|true|false>`
-- `bin/appearance-dispatch cache <on|off|1|0|true|false>`
+### Recommended: `dispatch`
 
-Which one should you use?
+```
+bin/appearance-dispatch dispatch <on|off|1|0|true|false>
+```
 
-- Use `tmux` when you live inside tmux and want tmux to be the source of truth.
-- Use `cache` when you are not in tmux (or you want a simple file-based source of truth).
+This is the unified pipeline. On each call it:
 
-The dispatcher is careful about signaling: in `cache` mode it only signals shell processes that have opted in (shells that loaded this plugin), so it avoids accidentally sending signals to unrelated shells.
+1. Runs `ZAC_IO_CMD` once if the appearance changed (skipped if already applied — idempotent).
+2. Writes both ground truths: tmux `@dark_appearance` and the cache file.
+3. Signals all registered shells with `USR1`.
+
+If `ZAC_IO_CMD` fails, the entire pipeline is aborted — no shells are signaled. This ensures your tool config files and your shells are always in sync.
+
+To pass `ZAC_IO_CMD` from a watcher that does not inherit your shell environment (such as WezTerm), set it via `env`:
+
+```
+env ZAC_IO_CMD=/path/to/your/io-script bin/appearance-dispatch dispatch 1
+```
+
+### Legacy: `tmux` and `cache`
+
+The older two-call pattern is still supported for backward compatibility:
+
+```
+bin/appearance-dispatch tmux <on|off|1|0|true|false>
+bin/appearance-dispatch cache <on|off|1|0|true|false>
+```
+
+Both now call the same unified pipeline internally, so they behave identically to `dispatch`.
+
+The dispatcher only signals shell processes that have opted in (shells that loaded this plugin), so it avoids accidentally sending signals to unrelated shells.
 
 <details>
 <summary><strong>TL;DR: cache updates (in-place vs atomic)</strong></summary>
 
-In `cache` mode the appearance file is updated “in place” by default. In plain words: we overwrite the contents of the same file, so it stays the same file on disk. This keeps file watchers simple.
+The appearance cache file is updated “in place” by default. In plain words: we overwrite the contents of the same file, so it stays the same file on disk. This keeps file watchers simple.
 
-If you set `ZAC_CACHE_ATOMIC=1`, updates become “atomic”: the dispatcher writes a temporary file and then swaps it into place. This is more crash-proof, but given the tiny size of the `0/1` flag a read/write race is extremely unlikely (dark mode changes and your TUI reads the flag in that split-second). Choose atomic mode if you want peace of mind that shell scripts always read a valid value.
+If you set `ZAC_CACHE_ATOMIC=1`, updates become “atomic”: the dispatcher writes a temporary file and then swaps it into place. This is more crash-proof, but given the tiny size of the `0/1` flag a read/write race is extremely unlikely. Choose atomic mode if you want peace of mind that shell scripts always read a valid value.
 
 There is a tradeoff: because atomic mode replaces the file each time (the inode changes), tools that watch files (like editor configs) must watch the directory rather than the file itself.
 
@@ -227,16 +273,21 @@ local function scheme_for_appearance(appearance)
   --   macOS Homebrew (Intel):         /usr/local/bin
   --   zinit polaris:                  home .. '/.local/share/zinit/polaris/bin'
   local tmux_dir = '/opt/homebrew/bin'  -- adjust to match where tmux lives on your system
-  local env_path  = tmux_dir .. ':' .. os.getenv('PATH')
+  local env_path = tmux_dir .. ':' .. os.getenv('PATH')
 
   local is_dark = appearance:find('Dark') ~= nil
   local dark = is_dark and '1' or '0'
 
-  -- Choose where to dispatch:
-  -- - "tmux"  keeps tmux @dark_appearance updated
-  -- - "cache" updates a small cache file for non-tmux shells
-  wezterm.run_child_process({ 'env', 'PATH=' .. env_path, zac_dispatcher, 'tmux', dark })
-  wezterm.run_child_process({ 'env', 'PATH=' .. env_path, zac_dispatcher, 'cache', dark })
+  -- Single dispatch call: writes both ground truths and signals all shells.
+  -- Pass ZAC_IO_CMD explicitly — WezTerm does not inherit your shell environment,
+  -- so env vars from .zshenv are not available here.
+  -- Omit the ZAC_IO_CMD line if you have no heavy I/O to run.
+  wezterm.run_child_process({
+    'env',
+    'PATH=' .. env_path,
+    'ZAC_IO_CMD=' .. home .. '/path/to/your/io-script',  -- optional
+    zac_dispatcher, 'dispatch', dark,
+  })
 
   return is_dark and 'My Dark Scheme' or 'My Light Scheme'
 end
@@ -247,8 +298,6 @@ wezterm.on('window-config-reloaded', function(window, pane)
   window:set_config_overrides(overrides)
 end)
 ```
-
-If you already know you only use tmux (or only use non-tmux shells), you can remove the dispatch you do not need.
 
 ## tmux: theme switching with @dark_appearance
 
@@ -296,7 +345,7 @@ That file contains a single character:
 - `1` for dark
 - `0` for light
 
-Your watcher updates it by calling `bin/appearance-dispatch cache ...`, and then your shells (and Neovim) can react.
+Your watcher updates it by calling `bin/appearance-dispatch dispatch ...`, and then your shells (and Neovim) can react.
 
 Here is a minimal sketch (inspired by the same mechanics Henrik describes) that watches the file and switches Neovim’s background:
 
@@ -439,7 +488,7 @@ If you use the Catppuccin theme for Emacs, this minimal setup switches between `
 (zac-watch-start)
 ```
 
-Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch cache ...`), Emacs can follow along.
+Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch dispatch ...`), Emacs can follow along.
 
 ## Author
 - **Author:** Andrea Alberti
