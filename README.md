@@ -73,10 +73,7 @@ plugins=(... zsh-appearance-control)
 ```zsh
 zinit lucid wait light-mode for \
     wait'0' \
-    atinit"
-      export ZAC_IMMEDIATE_CALLBACK_FNC=my_immediate_callback
-      export ZAC_IO_CMD=/path/to/your/io-script
-    " \
+    atinit"export ZAC_IMMEDIATE_CALLBACK_FNC=my_immediate_callback" \
     atload'zac sync && my_immediate_callback "$REPLY"' \
     path/to/zsh-appearance-control
 ```
@@ -85,13 +82,13 @@ zinit lucid wait light-mode for \
 <summary><strong>A few things worth noting</strong></summary>
 
 - `wait'0'` defers loading until after the first prompt, so the plugin does not slow down shell startup. If your prompt theme needs the appearance applied before the very first draw, load the plugin earlier (remove `wait` entirely or use a lower turbo stage).
-- `atinit` sets the configuration variables before the plugin is sourced.
+- `atinit` sets `ZAC_IMMEDIATE_CALLBACK_FNC` before the plugin is sourced.
 - `atload` runs `zac sync` once after the plugin loads to read the current appearance, then calls your immediate callback directly to apply it to the current shell. `zac sync` stores the result in `$REPLY`, so passing it straight to the callback avoids a second query.
-- `ZAC_IO_CMD` is not called by `atload` — it only runs inside the dispatcher (`bin/appearance-dispatch`), not on shell startup.
+- `ZAC_IO_CMD` is read by `bin/appearance-dispatch`, not by the plugin. Set it via `env` in your watcher (e.g. WezTerm) — not here. See [Connecting it to your terminal](#connecting-it-to-your-terminal-the-watcher).
 
 </details>
 
-For `my_immediate_callback` and the `io-script`, see [If you want your shell to react](#if-you-want-your-shell-to-react).
+For `my_immediate_callback`, see [If you want your shell to react](#if-you-want-your-shell-to-react).
 
 ### DIY (no plugin manager)
 
