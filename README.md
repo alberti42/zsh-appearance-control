@@ -135,6 +135,8 @@ The plugin gives you three hooks. The right one depends on what you are trying t
 
 Must be a single executable path. If you need to pass arguments or set environment variables, write a small wrapper script. Use `#!/bin/zsh` (without `-f`) as the shebang so that your `.zshenv` is sourced automatically and your usual environment variables are available.
 
+`ZAC_IO_CMD` is read by `bin/appearance-dispatch`, not by the plugin. If your watcher is an external process that does not inherit your shell environment (such as WezTerm), you must pass `ZAC_IO_CMD` explicitly via `env` when invoking the dispatcher — exporting it in your `.zshrc` or plugin config has no effect on that invocation. See the WezTerm example below.
+
 ```zsh
 export ZAC_IO_CMD=/path/to/your/io-script
 ```
