@@ -9,13 +9,27 @@ umask 077
 # This script is intended to be called by OS watchers (WezTerm, launchd, etc.).
 # It does not source the plugin and it runs with `-f` (no rc files).
 #
-# Behavior (tmux):
-# - Set tmux option @dark_appearance to the provided value (0/1)
-# - Signal shell panes (zsh) with USR1 so the plugin can sync on next hook
+# Behavior (dispatch — recommended):
+# - Run ZAC_IO_CMD once if the appearance changed (idempotent via io.last_applied).
+# - Write both ground truths: tmux @dark_appearance and cache file.
+# - Signal all registered shells (tmux panes + pid registry).
+#
+# Legacy sub-commands (tmux, cache) are kept for backward compatibility.
+# They now call the same unified _dispatch pipeline.
 
 function _usage() {
   local _dispatch_script=$1
-  print -r -- "usage: $_dispatch_script <tmux|cache> <on|off|1|0|true|false>" >&2
+  print -r -- "usage: $_dispatch_script <dispatch|tmux|cache> <on|off|1|0|true|false>" >&2
+  print -r -- "" >&2
+  print -r -- "  dispatch  Recommended: unified pipeline with optional ZAC_IO_CMD." >&2
+  print -r -- "  tmux      Legacy: alias for dispatch (backward compat)." >&2
+  print -r -- "  cache     Legacy: alias for dispatch (backward compat)." >&2
+  print -r -- "" >&2
+  print -r -- "Environment:" >&2
+  print -r -- "  ZAC_IO_CMD        Single executable run once per appearance change." >&2
+  print -r -- "                    Called as: \$ZAC_IO_CMD <0|1>. Abort on failure." >&2
+  print -r -- "  ZAC_CACHE_DIR     Override default cache directory." >&2
+  print -r -- "  ZAC_CACHE_ATOMIC  Set to 1 for atomic (rename-based) cache writes." >&2
 }
 
 function _start_epoch_for_pid() {
@@ -39,6 +53,127 @@ function _start_epoch_for_pid() {
   print -r -- "$start_epoch"
 }
 
+function _acquire_lock() {
+  local lock_dir=$1 i=0
+  while (( i < 20 )); do
+    command mkdir -- "$lock_dir" 2>/dev/null && return 0
+    command sleep 0.1
+    (( i++ ))
+  done
+  print -r -- "appearance-dispatch: failed to acquire lock: $lock_dir" >&2
+  return 1
+}
+
+function _release_lock() {
+  command rmdir -- "$1" 2>/dev/null || true
+}
+
+function _signal_tmux_panes() {
+  command -v tmux >/dev/null 2>&1 || return 0
+  local pid comm
+  command tmux list-panes -a -F '#{pane_pid}' 2>/dev/null |
+    while IFS= read -r pid; do
+      [[ $pid == <-> ]] || continue
+      comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || continue
+      [[ $comm == *zsh ]] || continue
+      command kill -USR1 "$pid" 2>/dev/null || true
+    done
+}
+
+function _signal_pids_from_dir() {
+  local pids_dir=$1
+  [[ -d $pids_dir ]] || return 0
+  local pid_file pid stored_start cur_start comm
+  for pid_file in "$pids_dir"/*; do
+    pid=${pid_file:t}
+    [[ $pid == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
+
+    IFS= read -r stored_start <"$pid_file" 2>/dev/null || stored_start=''
+    stored_start=${stored_start%%[[:space:]]##}
+    stored_start=${stored_start##[[:space:]]##}
+    [[ $stored_start == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
+
+    cur_start=$(_start_epoch_for_pid "$pid") || cur_start=''
+    if [[ -z $cur_start || $cur_start != $stored_start ]]; then
+      command rm -f -- "$pid_file" 2>/dev/null || true
+      continue
+    fi
+
+    comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || comm=''
+    [[ $comm == *zsh* ]] || continue
+
+    command kill -USR1 "$pid" 2>/dev/null || {
+      command rm -f -- "$pid_file" 2>/dev/null || true
+    }
+  done
+}
+
+function _dispatch() {
+  local dark_mode=$1
+  local cache_dir=${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/zac}
+  local lock_dir="$cache_dir/io.lock"
+  local last_applied_file="$cache_dir/io.last_applied"
+  local appearance_file="$cache_dir/appearance"
+  local pids_dir="$cache_dir/pids"
+  local io_cmd=${ZAC_IO_CMD:-''}
+  local atomic=${ZAC_CACHE_ATOMIC:-0}
+
+  command mkdir -p -- "$pids_dir" 2>/dev/null || {
+    print -r -- "appearance-dispatch: failed to create: $pids_dir" >&2
+    return 1
+  }
+  command chmod 700 -- "$cache_dir" "$pids_dir" 2>/dev/null || true
+
+  # Acquire lock — covers entire sequence below.
+  _acquire_lock "$lock_dir" || return 1
+
+  # Re-check io.last_applied under lock (guards against concurrent callers).
+  local last_applied=''
+  [[ -r $last_applied_file ]] && IFS= read -r last_applied <"$last_applied_file" 2>/dev/null
+  last_applied=${last_applied%%[[:space:]]##}
+  last_applied=${last_applied##[[:space:]]##}
+
+  if [[ -n $io_cmd && $last_applied != $dark_mode ]]; then
+    if ! command "$io_cmd" "$dark_mode"; then
+      print -r -- "appearance-dispatch: ZAC_IO_CMD failed; aborting" >&2
+      _release_lock "$lock_dir"
+      return 1
+    fi
+    builtin print -r -- "$dark_mode" >| "$last_applied_file" 2>/dev/null || true
+    command chmod 600 -- "$last_applied_file" 2>/dev/null || true
+  fi
+
+  # Write ground truth — tmux (if available).
+  if command -v tmux >/dev/null 2>&1; then
+    command tmux set-option -gq @dark_appearance "$dark_mode" 2>/dev/null || true
+  fi
+
+  # Write ground truth — cache file (always).
+  if (( atomic )); then
+    local tmp_file="$appearance_file.$$"
+    builtin print -r -- "$dark_mode" >| "$tmp_file" 2>/dev/null &&
+      command mv -f -- "$tmp_file" "$appearance_file" 2>/dev/null || {
+        command rm -f -- "$tmp_file" 2>/dev/null || true
+        print -r -- "appearance-dispatch: failed to write: $appearance_file" >&2
+        _release_lock "$lock_dir"
+        return 1
+      }
+  else
+    builtin print -r -- "$dark_mode" >| "$appearance_file" 2>/dev/null || {
+      print -r -- "appearance-dispatch: failed to write: $appearance_file" >&2
+      _release_lock "$lock_dir"
+      return 1
+    }
+  fi
+  command chmod 600 -- "$appearance_file" 2>/dev/null || true
+
+  # Signal all shells.
+  _signal_tmux_panes
+  _signal_pids_from_dir "$pids_dir"
+
+  _release_lock "$lock_dir"
+}
+
 local type=${1:-}
 local mode=${2:-}
 
@@ -59,92 +194,11 @@ case $mode in
 esac
 
 case $type in
-  (tmux)
-    command -v tmux >/dev/null 2>&1 || {
-      print -r -- "appearance-dispatch: tmux not found" >&2
-      exit 1
-    }
-
-    command tmux set-option -gq @dark_appearance "$dark_mode" 2>/dev/null || true
-
-    local pid comm
-    command tmux list-panes -a -F '#{pane_pid}' 2>/dev/null |
-      while IFS= read -r pid; do
-        [[ $pid == <-> ]] || continue
-
-        comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || continue
-        [[ $comm == *zsh ]] || continue
-
-        command kill -USR1 "$pid" 2>/dev/null || true
-      done
+  (dispatch|tmux|cache)
+    _dispatch "$dark_mode"
+    exit $?
   ;;
-
-  (cache)
-    local cache_dir=${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/zac}
-    local pids_dir="$cache_dir/pids"
-    local appearance_file="$cache_dir/appearance"
-    local atomic=${ZAC_CACHE_ATOMIC:-0}
-
-    command mkdir -p -- "$pids_dir" 2>/dev/null || {
-      print -r -- "appearance-dispatch: failed to create: $pids_dir" >&2
-      exit 1
-    }
-    command chmod 700 -- "$cache_dir" "$pids_dir" 2>/dev/null || true
-
-    if (( atomic )); then
-      # Atomic update: write temp file then rename into place.
-      # Ensures readers see a complete value (old or new, never partial),
-      # but replaces the file inode on each update.
-      # Tools that watch for changes (e.g. Emacs/Neovim configs) must watch the
-      # directory, not the file itself.
-      local tmp_file="$appearance_file.$$"
-      builtin print -r -- "$dark_mode" >| "$tmp_file" 2>/dev/null || {
-        print -r -- "appearance-dispatch: failed to write: $tmp_file" >&2
-        exit 1
-      }
-      command mv -f -- "$tmp_file" "$appearance_file" 2>/dev/null || {
-        command rm -f -- "$tmp_file" 2>/dev/null || true
-        print -r -- "appearance-dispatch: failed to update: $appearance_file" >&2
-        exit 1
-      }
-    else
-      # In-place update: keep inode stable.
-      # For this plugin a one-byte flag file is enough; readers should treat anything
-      # other than "0" or "1" as transient (i.e.,invalid) and retry.
-      builtin print -r -- "$dark_mode" >| "$appearance_file" 2>/dev/null || {
-        print -r -- "appearance-dispatch: failed to write: $appearance_file" >&2
-        exit 1
-      }
-    fi
-    command chmod 600 -- "$appearance_file" 2>/dev/null || true
-
-    local pid_file pid stored_start cur_start comm
-    for pid_file in "$pids_dir"/*; do
-      pid=${pid_file:t}
-      [[ $pid == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
-
-      IFS= read -r stored_start <"$pid_file" 2>/dev/null || stored_start=''
-      stored_start=${stored_start%%[[:space:]]##}
-      stored_start=${stored_start##[[:space:]]##}
-      [[ $stored_start == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
-
-      cur_start=$(_start_epoch_for_pid "$pid") || cur_start=''
-      if [[ -z $cur_start || $cur_start != $stored_start ]]; then
-        command rm -f -- "$pid_file" 2>/dev/null || true
-        continue
-      fi
-
-      comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || comm=''
-      [[ $comm == *zsh* ]] || continue
-
-      command kill -USR1 "$pid" 2>/dev/null || {
-        command rm -f -- "$pid_file" 2>/dev/null || true
-      }
-    done
-  ;;
-
   (*)
-    # TODO: define a convention for non-tmux propagation (cache file, etc.).
     print -r -- "appearance-dispatch: unsupported type: $type" >&2
     _usage "${0:t}"
     exit 1

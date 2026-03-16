@@ -99,6 +99,12 @@ function _zac.init.config() {
   : ${_zac[cfg.callback_fnc]:=''}
   : ${_zac[cfg.callback_fnc]:=${ZAC_CALLBACK_FNC:-''}}
 
+  # immediate_callback_fnc: optional function called directly inside TRAPUSR1.
+  # MUST be restricted to simple env var assignments only.
+  # No I/O, no subshells, no external commands.
+  : ${_zac[cfg.immediate_callback_fnc]:=''}
+  : ${_zac[cfg.immediate_callback_fnc]:=${ZAC_IMMEDIATE_CALLBACK_FNC:-''}}
+
   # debug.mode: enable debug FIFO logging.
   : ${_zac[cfg.debug_mode]:=${ZAC_DEBUG:-0}}
 
@@ -340,6 +346,20 @@ function _zac.init() {
     fi
 
     TRAPUSR1() {
+      # Read cache file immediately for instant state update.
+      local _zac_trap_val='' _zac_trap_file=${_zac[cfg.cache_dir]}/appearance
+      IFS= read -r _zac_trap_val <"$_zac_trap_file" 2>/dev/null || _zac_trap_val=''
+      case $_zac_trap_val in
+        (0|1) _zac[state.is_dark]=$_zac_trap_val ;;
+      esac
+
+      # Immediate callback — env var assignments only.
+      local _zac_trap_imm=${_zac[cfg.immediate_callback_fnc]:-}
+      if [[ -n $_zac_trap_imm ]] && (( $+functions[$_zac_trap_imm] )); then
+        $_zac_trap_imm ${_zac[state.is_dark]}
+      fi
+
+      # Schedule deferred callback via precmd (unchanged).
       _zac[state.needs_sync]=1
       (( $+functions[_zac.trapusr1.prev] )) && _zac.trapusr1.prev
     }
