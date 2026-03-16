@@ -95,9 +95,10 @@ function _zac.init.config() {
   # This is the only place that reads ZAC_* env vars.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
-  # callback.fnc: optional function name called as: $callback <is_dark>
-  : ${_zac[cfg.callback_fnc]:=''}
-  : ${_zac[cfg.callback_fnc]:=${ZAC_CALLBACK_FNC:-''}}
+  # deferred_callback_fnc: optional function called at precmd/preexec as: $callback <is_dark>
+  # ZAC_CALLBACK_FNC is supported as a legacy alias.
+  : ${_zac[cfg.deferred_callback_fnc]:=''}
+  : ${_zac[cfg.deferred_callback_fnc]:=${ZAC_DEFERRED_CALLBACK_FNC:-${ZAC_CALLBACK_FNC:-''}}}
 
   # immediate_callback_fnc: optional function called directly inside TRAPUSR1.
   # MUST be restricted to simple env var assignments only.
@@ -389,7 +390,7 @@ function _zac.propagate() {
 
   _zac.debug.log "core | propagate | is_dark=${_zac[state.is_dark]:-}"
 
-  local cb=${_zac[cfg.callback_fnc]}
+  local cb=${_zac[cfg.deferred_callback_fnc]}
   if [[ -n $cb && $+functions[$cb] -eq 1 ]]; then
     local is_dark=${_zac[state.is_dark]:-0}
      

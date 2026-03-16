@@ -98,13 +98,13 @@ On Linux, GNOME is supported via the GNOME setting.
 
 ### If you want your shell to react
 
-You can provide a callback function name via an environment variable.
-When the cached value changes, the plugin will call your function with one argument:
+The plugin provides two callback hooks with different timing guarantees. Both receive one argument: `1` for dark, `0` for light.
 
-- `1` for dark
-- `0` for light
+**`ZAC_IMMEDIATE_CALLBACK_FNC`** — called directly inside the signal handler, before the next prompt redraws. Use this for lightweight, instant updates: `export`, `typeset`, `zstyle`, and `source` of files that only contain variable assignments. No I/O, no subshells, no external commands.
 
-Example idea: export a few variables your theme reads. Here is a minimal example that tweaks fzf colors depending on appearance:
+**`ZAC_DEFERRED_CALLBACK_FNC`** — called at the next `precmd`/`preexec` boundary. Safe for anything: prompt redraws, plugin reconfiguration, external tool calls.
+
+A minimal example using the deferred callback to tweak fzf colors:
 
 ```zsh
 my_zac_callback() {
@@ -118,7 +118,7 @@ my_zac_callback() {
 }
 
 # Export this variable before loading zsh-appearance-control
-export ZAC_CALLBACK_FNC=my_zac_callback
+export ZAC_DEFERRED_CALLBACK_FNC=my_zac_callback
 ```
 
 ## Connecting it to your terminal (the “watcher”)
@@ -187,11 +187,15 @@ export ZAC_SSH_TMUX_SESSION=main
 
 Configuration is done with environment variables (set them before the plugin is loaded):
 
-- `ZAC_CALLBACK_FNC` name of a function to call when appearance changes
+- `ZAC_IMMEDIATE_CALLBACK_FNC` name of a function called inside the signal handler (env var assignments only)
+- `ZAC_DEFERRED_CALLBACK_FNC` name of a function called at the next precmd/preexec (safe for anything)
+- `ZAC_IO_CMD` path to an executable run once per appearance change by the dispatcher (heavy I/O)
 - `ZAC_CACHE_DIR` where to store the non-tmux cache file and pid registry
 - `ZAC_LINUX_DESKTOP` set to `gnome` to force GNOME support, or `none` to disable it
 - `ZAC_DEBUG` set to `1` to enable debug logging
 - `ZAC_ENABLE_SSH_TMUX` set to `0` to disable the `ssh-tmux` extra
+
+`ZAC_CALLBACK_FNC` is accepted as a legacy alias for `ZAC_DEFERRED_CALLBACK_FNC`.
 
 ## A note on watchers
 
