@@ -18,15 +18,18 @@ function _zac.dark_mode.query_ground_truth() {
   local file="$dir/appearance"
   local v
 
+  # Return the result in a shell variable
+  typeset -g REPLY
+
   if [[ -n $dir && -f $file ]]; then
     IFS= read -r v <"$file" 2>/dev/null || v=''
     case $v in
-      (1) typeset -g REPLY=1; return 0 ;;
-      (0) typeset -g REPLY=0; return 0 ;;
+      (1) REPLY=1; return 0 ;;
+      (0) REPLY=0; return 0 ;;
     esac
   fi
 
   # Unknown.
-  typeset -g REPLY=''
+  REPLY=''
   return 1
 }

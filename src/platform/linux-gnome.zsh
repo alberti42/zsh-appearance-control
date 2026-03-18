@@ -17,6 +17,7 @@ function _zac.os_dark_mode.query() {
   # gsettings returns quoted values like: 'prefer-dark' or 'default'
   v=${v//\'/}
 
+  typeset -g REPLY
   [[ $v == prefer-dark ]] && REPLY=1 || REPLY=0
 }
 

@@ -12,11 +12,11 @@
 function _zac.os_dark_mode.query() {
   # Query OS dark mode.
   # Sets REPLY to 1 (dark) or 0 (light).
-  local v
-
+  typeset -g REPLY
+  
   _zac.debug.log "darwin | query os_dark_mode"
 
-  v=$(command osascript 2>/dev/null <<'OSA'
+  local v=$(command osascript 2>/dev/null <<'OSA'
 tell application "System Events"
 	tell appearance preferences
 		get dark mode
@@ -40,12 +40,15 @@ function _zac.os_dark_mode.set() {
   # - Sets REPLY to the requested target (0/1).
   # - Starts the osascript process in the background (&!) to avoid blocking.
   # - Does not guarantee that the OS has finished switching when it returns.
+  
   local target=$1
   local value tpl script
 
+  # Return the result in a shell variable
+  
   _zac.debug.log "darwin | set os_dark_mode target=${target}"
 
-  REPLY=$target
+  typeset -g REPLY=$target
 
   (( target )) && value=true || value=false
 

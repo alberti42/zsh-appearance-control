@@ -17,6 +17,7 @@ function _zac.tmux_dark_mode.query() {
   read -r v < <(command tmux show-options -gvq @dark_appearance 2>/dev/null)
   : ${v:=0}
 
+  typeset -g REPLY
   case $v in
     (1|on|true|yes) REPLY=1 ;;
     (*)             REPLY=0 ;;
