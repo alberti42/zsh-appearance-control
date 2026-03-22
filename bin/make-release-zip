@@ -8,10 +8,10 @@ setopt errexit nounset pipefail
 # The zip contains only the runtime files needed by users:
 # - plugin entrypoint
 # - src/ modules
-# - bin/ helpers
+# - bin/ runtime helpers (appearance-dispatch, appearance-probe)
 # - README + LICENSE
-# - examples/
-# - logo/ (README references it)
+#
+# Build tools in bin/ (make-release-zip, make-extras) are excluded.
 
 function _usage() {
   print -r -- "usage: $1 <version-tag>" >&2
@@ -52,7 +52,6 @@ paths=(
   zsh-appearance-control.plugin.zsh
   src
   bin
-  examples
 )
 
 local p
@@ -68,6 +67,7 @@ command rsync -a --delete \
   --exclude '*.zwc' \
   --exclude '*.ai' \
   --exclude 'bin/make-release-zip' \
+  --exclude 'bin/make-extras' \
   -- ${paths[@]} "$stage/"
 
 command rm -f -- "$zip_path" 2>/dev/null || true

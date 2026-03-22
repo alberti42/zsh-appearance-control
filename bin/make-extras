@@ -1,0 +1,50 @@
+#!/usr/bin/env zsh
+
+emulate -LR zsh -o warn_create_global -o no_short_loops
+setopt errexit nounset pipefail
+
+# Copy extra release artifacts (editor integrations, themes) into dist/.
+# Each artifact is a single file attached directly to the GitHub release,
+# without zipping — there is no benefit to wrapping single files in a zip.
+
+function _usage() {
+  print -r -- "usage: $1 <version-tag>" >&2
+  print -r -- "example: $1 v0.1.0" >&2
+}
+
+local version=${1:-}
+if [[ -z $version ]]; then
+  _usage "${0:t}"
+  exit 2
+fi
+
+local repo_root
+repo_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
+  print -r -- "${0:t}: must run inside a git repository" >&2
+  exit 1
+}
+
+cd "$repo_root"
+
+local out_dir=dist
+command mkdir -p -- "$out_dir"
+
+# --- Emacs ---
+
+local emacs_file="editors/emacs/zac-theme-autodetection.el"
+if [[ ! -f $emacs_file ]]; then
+  print -r -- "${0:t}: missing file: $emacs_file" >&2
+  exit 1
+fi
+command cp -- "$emacs_file" "$out_dir/zac-theme-autodetection.el"
+print -r -- "$out_dir/zac-theme-autodetection.el"
+
+# --- tmux ---
+
+local tmux_file="examples/tmux/catppuccin.conf"
+if [[ ! -f $tmux_file ]]; then
+  print -r -- "${0:t}: missing file: $tmux_file" >&2
+  exit 1
+fi
+command cp -- "$tmux_file" "$out_dir/catppuccin.conf"
+print -r -- "$out_dir/catppuccin.conf"

@@ -10,6 +10,12 @@ endif
 		> editors/emacs/zac-theme-autodetection.el.tmp
 	mv editors/emacs/zac-theme-autodetection.el.tmp \
 		editors/emacs/zac-theme-autodetection.el
+	@# Update Version: header in the tmux catppuccin theme
+	sed 's/^# Version: .*$$/# Version: $(VERSION)/' \
+		examples/tmux/catppuccin.conf \
+		> examples/tmux/catppuccin.conf.tmp
+	mv examples/tmux/catppuccin.conf.tmp \
+		examples/tmux/catppuccin.conf
 	@# Create release notes skeleton if not already present
 	@if [ ! -f release-notes/release-v$(VERSION).md ]; then \
 		printf '# Change log\n\n## New features\n\n- \n\n## Bug fixes\n\n- \n' \

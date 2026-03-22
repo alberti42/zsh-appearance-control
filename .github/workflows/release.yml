@@ -29,18 +29,18 @@ jobs:
 
       - name: Build release zip
         run: |
-          chmod +x bin/make-release-zip bin/make-editors-zip
+          chmod +x bin/make-release-zip bin/make-extras
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             zsh -f bin/make-release-zip "${{ inputs.tag }}"
-            zsh -f bin/make-editors-zip "${{ inputs.tag }}"
+            zsh -f bin/make-extras "${{ inputs.tag }}"
           else
             zsh -f bin/make-release-zip "${{ github.ref_name }}"
-            zsh -f bin/make-editors-zip "${{ github.ref_name }}"
+            zsh -f bin/make-extras "${{ github.ref_name }}"
           fi
 
       - name: Create GitHub release and upload asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: dist/*
           generate_release_notes: true
           draft: true
