@@ -1,5 +1,13 @@
 ;;; zac-theme-autodetection.el --- Appearance sync via zsh-appearance-control -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Andrea Alberti
+
+;; Author: Andrea Alberti <a.alberti82@gmail.com>
+;; Version: 1.1.0
+;; Keywords: appearance theme dark-mode
+;; URL: https://github.com/alberti42/zsh-appearance-control
+;; Package-Requires: ((emacs "28.1"))
+
 ;; Generic module for reacting to OS appearance changes signalled by
 ;; zsh-appearance-control: https://github.com/alberti42/zsh-appearance-control
 ;;
