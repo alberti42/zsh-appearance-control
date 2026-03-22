@@ -29,11 +29,13 @@ jobs:
 
       - name: Build release zip
         run: |
-          chmod +x bin/make-release-zip
+          chmod +x bin/make-release-zip bin/make-editors-zip
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             zsh -f bin/make-release-zip "${{ inputs.tag }}"
+            zsh -f bin/make-editors-zip "${{ inputs.tag }}"
           else
             zsh -f bin/make-release-zip "${{ github.ref_name }}"
+            zsh -f bin/make-editors-zip "${{ github.ref_name }}"
           fi
 
       - name: Create GitHub release and upload asset

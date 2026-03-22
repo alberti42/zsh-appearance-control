@@ -1,0 +1,58 @@
+#!/usr/bin/env zsh
+
+emulate -LR zsh -o warn_create_global -o no_short_loops
+setopt errexit nounset pipefail
+
+# Build a zip containing editor integration modules, separate from the
+# zsh plugin release artifact.
+#
+# Each editor's module is placed at the root of the zip so users can
+# unzip and get the file(s) directly without extra directory nesting.
+
+function _usage() {
+  print -r -- "usage: $1 <version-tag>" >&2
+  print -r -- "example: $1 v0.1.0" >&2
+}
+
+local version=${1:-}
+if [[ -z $version ]]; then
+  _usage "${0:t}"
+  exit 2
+fi
+
+local repo_root
+repo_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
+  print -r -- "${0:t}: must run inside a git repository" >&2
+  exit 1
+}
+
+cd "$repo_root"
+
+local out_dir=dist
+command mkdir -p -- "$out_dir"
+
+local tmp
+tmp=$(command mktemp -d 2>/dev/null || command mktemp -d -t zac-editors)
+trap 'command rm -rf -- "$tmp" 2>/dev/null || true' EXIT
+
+# --- Emacs ---
+
+local emacs_src="editors/emacs"
+if [[ ! -d $emacs_src ]]; then
+  print -r -- "${0:t}: missing directory: $emacs_src" >&2
+  exit 1
+fi
+
+local emacs_package="zac-emacs-${version}"
+local emacs_stage="$tmp/$emacs_package"
+command mkdir -p -- "$emacs_stage"
+
+command rsync -a --delete \
+  --exclude '.DS_Store' \
+  -- "$emacs_src/" "$emacs_stage/"
+
+local emacs_zip="$out_dir/${emacs_package}.zip"
+command rm -f -- "$emacs_zip" 2>/dev/null || true
+(cd "$tmp" && zip -qr "$repo_root/$emacs_zip" "$emacs_package")
+
+print -r -- "$emacs_zip"

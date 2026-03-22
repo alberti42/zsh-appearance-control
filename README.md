@@ -17,7 +17,7 @@ This README also includes minimal, working examples of what that enables:
 
 - tmux theme switching — see [tmux](#tmux-theme-switching-with-dark_appearance)
 - Neovim auto theme switching (by watching the appearance file) — see [Neovim](#neovim-switch-running-instances-on-change)
-- Emacs auto theme switching (by watching the appearance file) — see [Emacs](#emacs-auto-switch-catppuccin-flavour)
+- Emacs auto theme switching (by watching the appearance file) — see [Emacs](#emacs-auto-theme-switching)
 
 It’s designed to be calm and predictable:
 
@@ -454,65 +454,61 @@ if handle then
 end
 ```
 
-## Emacs: auto switch Catppuccin flavour
+## Emacs: auto theme switching
 
-Emacs also has built-in file watching, so you can use the same idea: watch the appearance file and switch theme when it changes.
+This repo ships `editors/emacs/zac-theme-autodetection.el` (also available in [release artifacts](https://github.com/alberti42/zsh-appearance-control/releases/latest)). It watches the zsh-appearance-control appearance file and calls a user-supplied callback whenever the OS appearance changes. It needs no extra packages beyond what Emacs provides.
 
-If you use the Catppuccin theme for Emacs, this minimal setup switches between `macchiato` (dark) and `frappe` (light) based on `ZAC_CACHE_DIR/appearance`:
+It handles:
+
+- initial application at load time
+- daemon/emacsclient support (via `after-make-frame-functions`)
+- live file watching (via Emacs's built-in `file-notify`), with a graceful fallback message if file notifications are not supported
+
+### Setup
+
+Add the module's directory to your `load-path`, then set `zac-load-theme-callback` **before** loading the module so it is available for the initial application:
 
 ```elisp
-;; Catppuccin for Emacs https://github.com/catppuccin/emacs
-(use-package catppuccin-theme)
+(add-to-list 'load-path "/path/to/editors/emacs")
 
-(require 'subr-x)
+;; Set callback before loading the module.
+;; It receives :light or :dark.
+(setq zac-load-theme-callback
+      (lambda (appearance)
+        (load-theme (if (eq appearance :light)
+                        'modus-operandi
+                      'modus-vivendi-tinted) t)))
 
-(defvar zac--watch nil)
-(defvar zac--last-catppuccin-flavor nil)
-
-(defun zac--appearance-file ()
-  (expand-file-name
-   "appearance"
-   (or (getenv "ZAC_CACHE_DIR")
-       (expand-file-name "zac" (or (getenv "XDG_CACHE_HOME")
-                                   (expand-file-name "~/.cache"))))))
-
-(defun zac--read-appearance ()
-  (when (file-readable-p (zac--appearance-file))
-    (string-trim
-     (with-temp-buffer
-       (insert-file-contents (zac--appearance-file))
-       (buffer-string)))))
-
-(defun zac--apply-appearance ()
-  (let* ((v (zac--read-appearance))
-         (flavor (if (string= v "1") 'macchiato 'frappe)))
-    (unless (eq zac--last-catppuccin-flavor flavor)
-      (setq zac--last-catppuccin-flavor flavor)
-      (setq catppuccin-flavor flavor)
-      (mapc #'disable-theme custom-enabled-themes)
-      (load-theme 'catppuccin t)
-      ;; Optional: keep terminal Emacs backgrounds transparent
-      (set-face-attribute 'default nil :background "unspecified-bg")
-      (set-face-attribute 'mode-line nil :background "unspecified-bg")
-      (set-face-attribute 'mode-line-inactive nil :background "unspecified-bg"))))
-
-(defun zac-watch-start ()
-  (interactive)
-  (zac--apply-appearance)
-  (when (fboundp 'file-notify-add-watch)
-    (unless zac--watch
-      (setq zac--watch
-            (file-notify-add-watch
-             (zac--appearance-file)
-             '(change)
-             (lambda (_event)
-               (zac--apply-appearance)))))))
-
-;; Start watcher automatically.
-(zac-watch-start)
+;; Load the module. The watcher starts automatically.
+(require 'zac-theme-autodetection)
 ```
 
-Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch dispatch ...`), Emacs can follow along.
+[modus-operandi](https://protesilaos.com/emacs/modus-themes) (light) and `modus-vivendi-tinted` (dark) are built into Emacs 28+, so no extra package is needed. Swap them for any other theme theme you prefer.
+
+### Optional: harmonizing other faces after theme changes (Emacs 29+)
+
+Some packages do not automatically pick up face changes when a theme switches. In Emacs 29+, you can hook into `enable-theme-functions` to fix up any faces immediately after every `load-theme` call:
+
+```elisp
+(defun my/harmonize-theme (&rest _)
+  "Re-apply custom face settings after every theme change.
+Add any face customizations that your packages need here."
+  ;; Example: blend git-gutter background with the line-number column.
+  ;; (when (facep 'git-gutter:added)
+  ;;   (let ((bg (face-background 'line-number nil t)))
+  ;;     (dolist (face '(git-gutter:added git-gutter:modified
+  ;;                     git-gutter:deleted git-gutter:unchanged))
+  ;;       (when (facep face)
+  ;;         (set-face-background face bg)))))
+  )
+
+;; Fire on every theme change (Emacs 29+).
+(add-hook 'enable-theme-functions #'my/harmonize-theme)
+```
+
+Define and register this hook **before** loading `zac-theme-autodetection.el` so it also fires on the initial theme application.
+
+Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch dispatch ...`), Emacs will follow along.
 
 ## Author
 - **Author:** Andrea Alberti
