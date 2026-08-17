@@ -18,7 +18,9 @@
 # Glossary:
 # - "is_dark": boolean 0/1 representing dark mode enabled.
 # - "ground truth": the authoritative source of is_dark.
-#   For now: in tmux it is tmux option @dark_appearance; non-tmux is TODO.
+#   In tmux: the tmux option @dark_appearance.
+#   Outside tmux: the file $ZAC_CACHE_DIR/appearance (written by
+#   bin/appearance-dispatch).
 #
 # Entry points:
 # - Hook-driven refresh: precmd/preexec call _zac.sync when needs_sync=1.
