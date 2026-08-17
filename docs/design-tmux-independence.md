@@ -6,9 +6,10 @@ Status: agreed direction, not implemented. Written 2026-08-17.
 
 tmux is a **consumer** of the appearance, not its source.
 
-The dispatcher keeps writing the tmux option `@dark_appearance`, because the
-tmux status bar theme reads it (`examples/tmux/catppuccin.conf`). What goes away
-is the option as *ground truth for shells*.
+Neither the plugin nor `bin/appearance-dispatch` touches a tmux option any
+more. A user who themes tmux (`examples/tmux/catppuccin.conf`) sets
+`@dark_appearance` from their `ZAC_IO_CMD` script, exactly like any other
+consumer. Status: done, see the commits of 2026-08-17.
 
 ## New ground truth
 

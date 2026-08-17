@@ -11,8 +11,11 @@ umask 077
 #
 # Behavior (dispatch — recommended):
 # - Run ZAC_IO_CMD once if the appearance changed (idempotent via io.last_applied).
-# - Write both ground truths: tmux @dark_appearance and cache file.
-# - Signal all registered shells (tmux panes + pid registry).
+# - Write the ground truth: the cache file.
+# - Signal the registered shells (pid registry only).
+#
+# This script knows nothing about tmux, or about any other tool. Every consumer
+# (tmux, Neovim, Emacs, fzf, …) is driven by ZAC_IO_CMD or watches the file.
 #
 # Legacy sub-commands (tmux, cache) are kept for backward compatibility.
 # They now call the same unified _dispatch pipeline.
@@ -203,12 +206,11 @@ function _dispatch() {
     command chmod 600 -- "$last_applied_file" 2>/dev/null || true
   fi
 
-  # Write ground truth — tmux (if available).
-  if command -v tmux >/dev/null 2>&1; then
-    command tmux set-option -gq @dark_appearance "$dark_mode" 2>/dev/null || true
-  fi
-
-  # Write ground truth — cache file (always).
+  # Write ground truth — cache file.
+  #
+  # Note: we deliberately do NOT set the tmux option @dark_appearance here.
+  # tmux is a consumer like any other tool, so a user who themes tmux sets that
+  # option from their ZAC_IO_CMD script.
   if (( atomic )); then
     local tmp_file="$appearance_file.$$"
     builtin print -r -- "$dark_mode" >| "$tmp_file" 2>/dev/null &&

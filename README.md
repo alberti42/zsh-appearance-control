@@ -11,7 +11,7 @@ It gives you two things:
 1) a shared, always-updated “dark or light?” flag, kept in a small cache file
 2) a safe way to nudge running shells to resync when that flag changes
 
-tmux is not required. If you do use tmux, you get two extras: tmux can act as the watcher that detects the theme change (see [watcher options](#watcher-options)), and the dispatcher keeps the tmux option `@dark_appearance` up to date so your tmux theme can follow along.
+tmux is not required, and nothing in this plugin reads or writes a tmux option. If you do use tmux, it can act as the watcher that detects the theme change (see [watcher options](#watcher-options)), and it can be themed like any other consumer (see [tmux](#tmux-theme-switching-with-dark_appearance)).
 
 This README also includes minimal, working examples of what that enables:
 
@@ -46,7 +46,7 @@ Inside each shell, the plugin keeps a small cached value (`0` or `1`) and runs y
 
 There is exactly one place the plugin reads from: the cache file `$ZAC_CACHE_DIR/appearance` in your user cache directory. It holds `1` for dark and `0` for light. Reading it needs no external command, so it never slows your prompt down.
 
-The tmux option `@dark_appearance` is *written* by the dispatcher for tmux themes to read. The plugin itself never reads it.
+No tmux option is involved. If you theme tmux, you set `@dark_appearance` yourself from your `ZAC_IO_CMD` script; see [tmux](#tmux-theme-switching-with-dark_appearance).
 
 ## Install
 
@@ -183,7 +183,7 @@ bin/appearance-dispatch dispatch <on|off|1|0|true|false>
 This is the unified pipeline. On each call it:
 
 1. Runs `ZAC_IO_CMD` once if the appearance changed (skipped if already applied — idempotent).
-2. Writes the cache file (the ground truth), and the tmux option `@dark_appearance` when tmux is available (for tmux themes).
+2. Writes the cache file: the ground truth.
 3. Signals all registered shells with `USR1`.
 
 If `ZAC_IO_CMD` fails, the entire pipeline is aborted — no shells are signaled. This ensures your tool config files and your shells are always in sync.
@@ -330,8 +330,8 @@ local function scheme_for_appearance(appearance)
   local is_dark = appearance:find('Dark') ~= nil
   local dark = is_dark and '1' or '0'
 
-  -- Single dispatch call: writes the cache file (and the tmux option) and
-  -- signals the registered shells.
+  -- Single dispatch call: writes the cache file and signals the registered
+  -- shells.
   -- Pass ZAC_IO_CMD explicitly — WezTerm does not inherit your shell environment,
   -- so env vars from .zshenv are not available here.
   -- Omit the ZAC_IO_CMD line if you have no heavy I/O to run.
@@ -354,7 +354,20 @@ end)
 
 ## tmux: theme switching with @dark_appearance
 
-`bin/appearance-dispatch` sets the tmux option `@dark_appearance` on every dispatch, whichever watcher triggered it. Your tmux theme can read that option and switch palettes at once. This is the one place where tmux consumes the appearance; the plugin never reads the option back.
+tmux is a consumer of the appearance, like Neovim, Emacs or fzf. Neither the plugin nor the dispatcher touches any tmux option: you set `@dark_appearance` from your `ZAC_IO_CMD` script, and your tmux theme reads it.
+
+```zsh
+#!/bin/zsh
+# ZAC_IO_CMD script, called as: <script> <0|1>
+command tmux set-option -gq @dark_appearance "$1" 2>/dev/null
+```
+
+Your io script only runs on a real transition, so a tmux server that starts later has no option set. Read the file once at server start to cover that:
+
+```tmux
+run-shell -b 'f="${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/zac}/appearance"; \
+  [ -r "$f" ] && tmux set-option -gq @dark_appearance "$(cat "$f")"'
+```
 
 The key idea is simple:
 
