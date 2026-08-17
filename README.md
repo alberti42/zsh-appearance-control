@@ -11,11 +11,11 @@ It gives you two things:
 1) a shared, always-updated “dark or light?” flag, kept in a small cache file
 2) a safe way to nudge running shells to resync when that flag changes
 
-tmux is not required. If you do use tmux, you get two extras: tmux can act as the watcher that detects the theme change (see [watchers](#a-note-on-watchers)), and the dispatcher keeps the tmux option `@dark_appearance` up to date so your tmux theme can follow along.
+tmux is not required. If you do use tmux, you get two extras: tmux can act as the watcher that detects the theme change (see [watcher options](#watcher-options)), and the dispatcher keeps the tmux option `@dark_appearance` up to date so your tmux theme can follow along.
 
 This README also includes minimal, working examples of what that enables:
 
-- tmux as a watcher, and tmux theme switching — see [watchers](#a-note-on-watchers) and [tmux](#tmux-theme-switching-with-dark_appearance)
+- tmux as a watcher, and tmux theme switching — see [watcher options](#watcher-options) and [tmux](#tmux-theme-switching-with-dark_appearance)
 - Neovim auto theme switching (by watching the appearance file) — see [Neovim](#neovim-switch-running-instances-on-change)
 - Emacs auto theme switching (by watching the appearance file) — see [Emacs](#emacs-auto-theme-switching)
 
@@ -167,12 +167,12 @@ my_deferred_callback() {
 export ZAC_DEFERRED_CALLBACK_FNC=my_deferred_callback
 ```
 
-## Connecting it to your terminal (the “watcher”)
+## The dispatcher: `bin/appearance-dispatch`
 
 The plugin does not try to guess when your system appearance changes.
-Instead, you (or your terminal) call a tiny helper script when the appearance changes.
+Instead, a watcher calls a tiny helper script when the appearance changes.
 
-This repo ships a standalone dispatcher: `bin/appearance-dispatch`.
+This repo ships that standalone dispatcher: `bin/appearance-dispatch`. This section describes what it does; [watcher options](#watcher-options) shows who calls it.
 
 ### Recommended: `dispatch`
 
@@ -268,7 +268,7 @@ Configuration is done with environment variables (set them before the plugin is 
 
 `ZAC_CALLBACK_FNC` is accepted as a legacy alias for `ZAC_DEFERRED_CALLBACK_FNC`.
 
-## A note on watchers
+## Watcher options
 
 The plugin does not detect appearance changes by itself. Something must call `bin/appearance-dispatch`. That something is the *watcher*, and you have several options. Pick whichever fits your setup; they all end in the same single call.
 
