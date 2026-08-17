@@ -69,5 +69,7 @@ one. A wrong theme in an old pane is acceptable.
   roughly 10 to 30 ms) or opens a new one (hundreds of milliseconds). The call
   must run in the background and must never delay the local prompt.
 - Cleanup of stale `appearance.<ID>` files when a connection ends.
+- Whether per-connection scoping is worth it at all: one person uses one theme
+  at a time, so the per-user file is usually the right scope.
 - Migration: keep reading the tmux option while old remote hosts still run the
   previous version.

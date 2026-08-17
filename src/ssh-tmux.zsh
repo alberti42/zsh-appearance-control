@@ -12,12 +12,12 @@
 # the remote shells that are already running. If it is not installed, we write
 # the default cache file directly.
 #
-# Limitations (see docs/design-tmux-independence.md):
-# - The remote file is per user on that host, so all of that user's sessions
-#   there share one value: your ssh session and a session they started at the
-#   machine itself. Per-connection scoping comes with the connection ID.
-# - We assume the default remote cache path; a remote ZAC_CACHE_DIR is unknown
-#   to us.
+# The remote file is per user on that host, so all sessions of that user there
+# share one value. That is the intended scope: one person uses one theme at a
+# time.
+#
+# Limitation: we assume the default remote cache path, because a remote
+# ZAC_CACHE_DIR is unknown to the local side.
 #
 # Safety:
 # - We do NOT send USR1 to remote processes ourselves.
