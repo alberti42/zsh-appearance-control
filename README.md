@@ -283,6 +283,8 @@ The plugin does not detect appearance changes by itself. Something must call `bi
 
 tmux asks the terminal about its theme and fires a hook when it changes. This works for local sessions, and also for a session you attached over ssh, because the report comes from your local terminal through the same connection.
 
+tmux 3.6 added this: it reports dark or light through mode 2031, and on terminals that do not implement that sequence it guesses the theme from the background colour.
+
 Add this to your tmux config, with the path adjusted to your install:
 
 ```tmux
@@ -300,7 +302,8 @@ Notes:
 - `run-shell` runs `/bin/sh` with the environment of the tmux **server**, so use an absolute path for the dispatcher and pass `ZAC_IO_CMD` explicitly.
 - `-b` runs the command in the background, so tmux never waits for it.
 - The hooks also fire when a client attaches, which is what you want after a restart.
-- Your terminal must report theme changes to tmux. If nothing happens, use one of the other options.
+- The hooks need tmux 3.6 or newer. Check with `tmux -V`, and check the hooks exist with `tmux show-hooks -g | grep theme`.
+- If nothing happens, your terminal probably does not report theme changes and the background-colour guess did not trigger. Use one of the other options.
 
 ### Option 2: WezTerm appearance hook
 
