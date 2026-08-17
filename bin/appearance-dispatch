@@ -81,6 +81,13 @@ function _signal_tmux_panes() {
 }
 
 function _signal_pids_from_dir() {
+  # Signal every registered shell in $pids_dir.
+  #
+  # Each file is named after the PID and contains the epoch seconds at which
+  # that shell registered itself. A shell registers after it starts, so for a
+  # live registration: process start time <= stored value. A reused PID always
+  # starts *after* the registration, so we drop it. One second of slack absorbs
+  # the whole-second granularity of `ps -o lstart`.
   local pids_dir=$1
   [[ -d $pids_dir ]] || return 0
   local pid_file pid stored_start cur_start comm
@@ -94,7 +101,7 @@ function _signal_pids_from_dir() {
     [[ $stored_start == <-> ]] || { command rm -f -- "$pid_file" 2>/dev/null || true; continue }
 
     cur_start=$(_start_epoch_for_pid "$pid") || cur_start=''
-    if [[ -z $cur_start || $cur_start != $stored_start ]]; then
+    if [[ -z $cur_start ]] || (( cur_start > stored_start + 1 )); then
       command rm -f -- "$pid_file" 2>/dev/null || true
       continue
     fi

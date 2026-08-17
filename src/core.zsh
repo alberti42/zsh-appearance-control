@@ -185,8 +185,13 @@ function _zac.cache.pid.register() {
   # Register this shell PID for safe external signaling.
   #
   # This creates a file in: $cfg.cache_dir/pids/$$
-  # The file contains the process start time as epoch seconds to avoid PID
-  # reuse hazards.
+  # The file contains the *registration* time as epoch seconds.
+  # bin/appearance-dispatch signals a PID only when the process start time is
+  # not later than this value, which rejects a reused PID.
+  #
+  # This runs on every interactive shell startup, so it must be fork-free:
+  # EPOCHSECONDS (zsh/datetime) and zf_mkdir/zf_chmod (zsh/files) are builtins.
+  # An earlier version called `ps` and `date` here and cost ~22 ms per shell.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
   builtin setopt extended_glob
 
@@ -194,42 +199,29 @@ function _zac.cache.pid.register() {
   [[ -n $dir ]] || return 0
 
   local pids_dir="$dir/pids"
-  command mkdir -p -- "$pids_dir" 2>/dev/null || return 0
-  command chmod 700 -- "$dir" "$pids_dir" 2>/dev/null || true
 
-  local start_epoch
-  start_epoch=$(_zac.cache.pid.start_epoch $$) || return 0
+  # The directory is created with mode 700, so the pid files inside it need no
+  # per-file chmod. Note: zf_chmod does not accept the `--` end-of-options mark.
+  if [[ ! -d $pids_dir ]]; then
+    if (( $+builtins[zf_mkdir] )); then
+      zf_mkdir -p -- "$pids_dir" 2>/dev/null || return 0
+      zf_chmod 700 "$dir" "$pids_dir" 2>/dev/null || true
+    else
+      command mkdir -p -- "$pids_dir" 2>/dev/null || return 0
+      command chmod 700 -- "$dir" "$pids_dir" 2>/dev/null || true
+    fi
+  fi
 
-  local pid_file="$pids_dir/$$"
-  umask 077
-  builtin print -r -- "$start_epoch" >| "$pid_file" 2>/dev/null || true
-}
+  # Fallback to `date` only if zsh/datetime is unavailable (one fork).
+  local now=${EPOCHSECONDS:-}
+  if [[ $now != <-> ]]; then
+    now=$(command date +%s 2>/dev/null) || return 0
+    [[ $now == <-> ]] || return 0
+  fi
 
-function _zac.cache.pid.start_epoch() {
-  # Print process start time as epoch seconds.
-  #
-  # This is used to avoid PID reuse hazards when externally signaling shells.
-  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
-  builtin setopt extended_glob
-
-  local pid=$1
-  [[ $pid == <-> ]] || return 1
-
-  local lstart
-  lstart=$(LC_ALL=C LANG=C command ps -p "$pid" -o lstart= 2>/dev/null) || return 1
-  lstart=${lstart##[[:space:]]##}
-  lstart=${lstart%%[[:space:]]##}
-  [[ -n $lstart ]] || return 1
-
-  local start_epoch
-  case $OSTYPE in
-    (darwin*) start_epoch=$(LC_ALL=C LANG=C command date -j -f "%a %b %e %T %Y" "$lstart" +%s 2>/dev/null) ;;
-    (linux*)  start_epoch=$(LC_ALL=C LANG=C command date -d "$lstart" +%s 2>/dev/null) ;;
-    (*)       return 1 ;;
-  esac
-
-  [[ $start_epoch == <-> ]] || return 1
-  builtin print -r -- "$start_epoch"
+  # Note: we do not touch the shell umask here (it is global state).
+  # The pid file is protected by the mode 700 of pids/ instead.
+  builtin print -r -- "$now" >| "$pids_dir/$$" 2>/dev/null || return 0
 }
 
 function _zac.cache.pid.unregister() {
@@ -239,7 +231,11 @@ function _zac.cache.pid.unregister() {
   local dir=${_zac[cfg.cache_dir]:-}
   [[ -n $dir ]] || return 0
 
-  command rm -f -- "$dir/pids/$$" 2>/dev/null || true
+  if (( $+builtins[zf_rm] )); then
+    zf_rm -f -- "$dir/pids/$$" 2>/dev/null || true
+  else
+    command rm -f -- "$dir/pids/$$" 2>/dev/null || true
+  fi
 }
 
 function _zac.cache.init() {
@@ -251,6 +247,11 @@ function _zac.cache.init() {
 
   local dir=${_zac[cfg.cache_dir]:-}
   [[ -n $dir ]] || return 0
+
+  # Builtins used by the register/unregister path, so that no fork is needed.
+  # Each zmodload costs ~0.5 ms, so we call it only when the feature is absent.
+  [[ -n ${EPOCHSECONDS:-} ]] || zmodload -F zsh/datetime p:EPOCHSECONDS 2>/dev/null
+  (( $+builtins[zf_mkdir] )) || zmodload -F zsh/files b:zf_mkdir b:zf_chmod b:zf_rm 2>/dev/null
 
   _zac.cache.pid.register
 
