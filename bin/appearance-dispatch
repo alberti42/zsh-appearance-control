@@ -53,20 +53,74 @@ function _start_epoch_for_pid() {
   print -r -- "$start_epoch"
 }
 
+# Path of the lock we currently hold, so the signal traps can release it.
+typeset -g _lock_held=''
+
 function _acquire_lock() {
-  local lock_dir=$1 i=0
+  # Acquire the dispatch lock. `mkdir` is the atomic operation.
+  #
+  # The lock records its owner PID, and a lock whose owner is gone is stolen.
+  # Without that, one killed dispatch would block every later dispatch with
+  # "failed to acquire lock" until the user removed the directory by hand.
+  local lock_dir=$1 i=0 owner='' stale
+
   while (( i < 20 )); do
-    command mkdir -- "$lock_dir" 2>/dev/null && return 0
-    command sleep 0.1
+    if command mkdir -- "$lock_dir" 2>/dev/null; then
+      builtin print -r -- $$ >| "$lock_dir/pid" 2>/dev/null || true
+      _lock_held=$lock_dir
+      return 0
+    fi
+
     (( i++ ))
+
+    owner=''
+    [[ -r $lock_dir/pid ]] && IFS= read -r owner <"$lock_dir/pid" 2>/dev/null
+
+    if [[ $owner == <-> ]]; then
+      # Owner still alive: wait for it.
+      if command kill -0 "$owner" 2>/dev/null; then
+        command sleep 0.1
+        continue
+      fi
+      print -r -- "appearance-dispatch: stealing lock of dead pid $owner" >&2
+      _release_lock "$lock_dir"
+      continue
+    fi
+
+    # No owner recorded: steal only when the lock is older than one minute,
+    # to stay safe against a writer that has not written its pid file yet.
+    stale=( $lock_dir(Nmm+1) )
+    if (( $#stale )); then
+      print -r -- "appearance-dispatch: stealing stale lock: $lock_dir" >&2
+      _release_lock "$lock_dir"
+      continue
+    fi
+
+    command sleep 0.1
   done
+
   print -r -- "appearance-dispatch: failed to acquire lock: $lock_dir" >&2
   return 1
 }
 
 function _release_lock() {
-  command rmdir -- "$1" 2>/dev/null || true
+  local lock_dir=$1
+  command rm -f -- "$lock_dir/pid" 2>/dev/null || true
+  command rmdir -- "$lock_dir" 2>/dev/null || true
+  [[ $_lock_held == $lock_dir ]] && _lock_held=''
+  return 0
 }
+
+# Release the lock when we are killed, so the next dispatch is not blocked.
+function _release_lock_on_signal() {
+  local sig=$1
+  [[ -n $_lock_held ]] && _release_lock "$_lock_held"
+  return $(( 128 + sig ))
+}
+TRAPINT()  { _release_lock_on_signal 2 }
+TRAPHUP()  { _release_lock_on_signal 1 }
+TRAPTERM() { _release_lock_on_signal 15 }
+TRAPEXIT() { [[ -n $_lock_held ]] && _release_lock "$_lock_held"; return 0 }
 
 function _signal_tmux_panes() {
   command -v tmux >/dev/null 2>&1 || return 0
