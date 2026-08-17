@@ -1,0 +1,151 @@
+#!/usr/bin/env zsh
+
+emulate -LR zsh -o warn_create_global -o no_short_loops
+setopt errexit nounset pipefail extended_glob
+
+# CHANGELOG.md helper, for the Keep a Changelog format
+# (https://keepachangelog.com/en/1.1.0/).
+#
+# Usage:
+#   changelog release <x.y.z>   Promote [Unreleased] to [x.y.z] - <today>,
+#                               and refresh the link references at the bottom.
+#   changelog section <x.y.z>   Print the body of the [x.y.z] section, for a
+#                               release description. Accepts a leading `v`.
+#
+# The file layout this script relies on:
+#   ## [Unreleased]
+#   ## [x.y.z] - YYYY-MM-DD
+#   [Unreleased]: <compare url>
+#   [x.y.z]: <compare url>
+
+function _usage() {
+  print -r -- "usage: ${0:t} <release|section> <x.y.z>" >&2
+}
+
+function _repo_root() {
+  # Sets REPLY to the repository root.
+  typeset -g REPLY
+  REPLY=$(command git rev-parse --show-toplevel 2>/dev/null) || {
+    print -r -- "${0:t}: must run inside a git repository" >&2
+    return 1
+  }
+}
+
+function _changelog_release() {
+  local version=$1 file=$2
+  local today body new_section prev_version repo_url
+
+  # Refuse an empty [Unreleased] section: releasing nothing is a mistake.
+  body=$(command awk '
+    /^## \[Unreleased\]/ { inside = 1; next }
+    /^## \[/            { inside = 0 }
+    inside              { print }
+  ' "$file")
+
+  if [[ -z ${body//[[:space:]]/} ]]; then
+    print -r -- "${0:t}: [Unreleased] is empty; nothing to release" >&2
+    return 1
+  fi
+
+  if command grep -q "^## \[${version}\]" "$file"; then
+    print -r -- "${0:t}: CHANGELOG.md already has a section for ${version}" >&2
+    return 1
+  fi
+
+  today=$(command date +%Y-%m-%d)
+
+  # Newest released version, needed for the compare link.
+  # sed, not awk: BSD awk has no match() with a capture array.
+  prev_version=$(command sed -n -E 's/^## \[([0-9]+\.[0-9]+\.[0-9]+)\].*/\1/p' "$file" | command head -1)
+
+  repo_url=$(command git remote get-url origin 2>/dev/null) || repo_url=''
+  repo_url=${repo_url%.git}
+  repo_url=${repo_url/git@github.com:/https://github.com/}
+  [[ -n $repo_url ]] || repo_url="https://github.com/alberti42/zsh-appearance-control"
+
+  local tmp="${file}.tmp"
+
+  # 1. Insert the new version heading right after [Unreleased].
+  command awk -v ver="$version" -v day="$today" '
+    { print }
+    /^## \[Unreleased\]/ && !done {
+      print ""
+      print "## [" ver "] - " day
+      done = 1
+    }
+  ' "$file" > "$tmp"
+
+  # 2. Rewrite the [Unreleased] link and add the link for the new version.
+  local unreleased_link="[Unreleased]: ${repo_url}/compare/v${version}...HEAD"
+  local version_link
+  if [[ -n $prev_version ]]; then
+    version_link="[${version}]: ${repo_url}/compare/v${prev_version}...v${version}"
+  else
+    version_link="[${version}]: ${repo_url}/releases/tag/v${version}"
+  fi
+
+  command awk -v u="$unreleased_link" -v v="$version_link" '
+    /^\[Unreleased\]:/ { print u; print v; next }
+    { print }
+  ' "$tmp" > "${tmp}.2"
+
+  command mv -f -- "${tmp}.2" "$file"
+  command rm -f -- "$tmp"
+
+  print -r -- "CHANGELOG.md: released ${version} (${today})"
+}
+
+function _changelog_section() {
+  local version=${1#v} file=$2
+  local body
+
+  body=$(command awk -v ver="$version" '
+    $0 ~ "^## \\[" ver "\\]" { inside = 1; next }
+    /^## \[/                 { inside = 0 }
+    /^\[[^]]+\]:/            { inside = 0 }
+    inside                   { print }
+  ' "$file")
+
+  if [[ -z ${body//[[:space:]]/} ]]; then
+    print -r -- "${0:t}: no section found for ${version}" >&2
+    return 1
+  fi
+
+  # Trim the blank lines at both ends.
+  print -r -- "${${body##[[:space:]]##}%%[[:space:]]##}"
+}
+
+local action=${1:-}
+local version=${2:-}
+
+if [[ -z $action || -z $version ]]; then
+  _usage
+  exit 2
+fi
+
+_repo_root
+local file="$REPLY/CHANGELOG.md"
+
+if [[ ! -f $file ]]; then
+  print -r -- "${0:t}: missing file: $file" >&2
+  exit 1
+fi
+
+case $action in
+  (release)
+    [[ ${version#v} == <->.<->.<-> ]] || {
+      print -r -- "${0:t}: expected a version like 1.2.3, got: ${version}" >&2
+      exit 2
+    }
+    _changelog_release "${version#v}" "$file"
+  ;;
+
+  (section)
+    _changelog_section "$version" "$file"
+  ;;
+
+  (*)
+    _usage
+    exit 2
+  ;;
+esac

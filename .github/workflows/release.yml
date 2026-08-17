@@ -38,9 +38,21 @@ jobs:
             zsh -f bin/make-extras "${{ github.ref_name }}"
           fi
 
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          chmod +x bin/changelog
+          mkdir -p dist
+          zsh -f bin/changelog section "$TAG" > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
       - name: Create GitHub release and upload asset
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
           draft: true

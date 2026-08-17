@@ -48,6 +48,7 @@ command mkdir -p -- "$stage"
 local -a paths
 paths=(
   README.md
+  CHANGELOG.md
   LICENSE
   zsh-appearance-control.plugin.zsh
   src

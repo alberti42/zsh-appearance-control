@@ -16,13 +16,8 @@ endif
 		> examples/tmux/catppuccin.conf.tmp
 	mv examples/tmux/catppuccin.conf.tmp \
 		examples/tmux/catppuccin.conf
-	@# Create release notes skeleton if not already present
-	@if [ ! -f release-notes/release-v$(VERSION).md ]; then \
-		printf '# Change log\n\n## New features\n\n- \n\n## Bug fixes\n\n- \n' \
-			> release-notes/release-v$(VERSION).md; \
-		echo "Created release-notes/release-v$(VERSION).md"; \
-	else \
-		echo "release-notes/release-v$(VERSION).md already exists, skipping"; \
-	fi
+	@# Promote the [Unreleased] section of CHANGELOG.md to this version.
+	@# Fails when [Unreleased] is empty, so a release always has notes.
+	zsh -f bin/changelog release $(VERSION)
 	@# Create local git tag
 	git tag v$(VERSION)
