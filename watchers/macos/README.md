@@ -111,6 +111,34 @@ usually calls tools from Homebrew or `~/.local/bin`. Two ways to cover that:
 Setting it in the plist is worth doing regardless: it makes the agent
 deterministic.
 
+## Signing and Gatekeeper
+
+The binary attached to a GitHub release is signed with a Developer ID
+certificate, built with the hardened runtime and a secure timestamp, and
+notarized by Apple. It therefore runs from a browser download without any
+Gatekeeper dance.
+
+The notarization ticket is **not stapled**, and cannot be: `stapler` handles
+disk images, code-signed bundles and installer packages, and a bare Mach-O
+executable is none of them. The ticket is registered against the binary's
+cdhash instead, so a quarantined copy is checked online the first time it runs.
+
+A binary you build yourself (`make watcher`) carries only the ad-hoc signature
+the linker gives it. That is fine: a locally built file is never quarantined.
+If you ever end up with a quarantined unsigned copy — for example one built on
+another machine and moved over — clear the flag:
+
+```zsh
+xattr -dr com.apple.quarantine /path/to/zac-watch-macos
+```
+
+To sign your own build, pass an identity to the packaging script:
+
+```zsh
+ZAC_CODESIGN_ID="Developer ID Application: Your Name (TEAMID)" \
+  zsh -f bin/make-watcher v9.9.9
+```
+
 ## Retry semantics
 
 A failed dispatch (non-zero `ZAC_IO_CMD`) writes no ground truth and signals no

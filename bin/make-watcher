@@ -13,6 +13,16 @@ setopt errexit nounset pipefail
 # Requires a macOS host with the Swift toolchain (Xcode command line tools).
 # The zsh plugin zip does not contain the watcher: it is a compiled, per-OS
 # artifact with its own lifecycle.
+#
+# Code signing: set ZAC_CODESIGN_ID to a "Developer ID Application: …" identity
+# and the build product is signed in place, with the hardened runtime and a
+# secure timestamp, before it is packaged. Both are required for notarization,
+# which is the workflow's job (it needs the Apple credentials, this script does
+# not). Unset, the binary keeps the ad-hoc signature the linker gives it, which
+# is right for a local build: a locally built binary is never quarantined.
+#
+# The signature lives inside the Mach-O, so the zip published here and the zip
+# submitted to notarytool carry the same signed bytes.
 
 function _usage() {
   print -r -- "usage: $1 <version-tag>" >&2
@@ -49,6 +59,16 @@ local binary="$pkg_dir/.build/apple/Products/Release/zac-watch-macos"
 if [[ ! -x $binary ]]; then
   print -r -- "${0:t}: build produced no binary at $binary" >&2
   exit 1
+fi
+
+local codesign_id=${ZAC_CODESIGN_ID:-}
+if [[ -n $codesign_id ]]; then
+  # In place, before staging: the workflow submits this same file to notarytool.
+  command codesign --force --timestamp --options runtime \
+    --sign "$codesign_id" "$binary"
+  command codesign --verify --strict --verbose=2 "$binary"
+else
+  print -r -- "${0:t}: ZAC_CODESIGN_ID unset, shipping the ad-hoc signature" >&2
 fi
 
 local plist="$pkg_dir/launchd/com.github.alberti42.zac-watch-macos.plist.in"

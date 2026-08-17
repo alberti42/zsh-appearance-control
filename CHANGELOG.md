@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The released `zac-watch-macos` binary is signed and notarized.** It is built
+  with the hardened runtime and a secure timestamp, signed with a Developer ID
+  certificate, and submitted to Apple's notary service by the release workflow.
+  An ad-hoc signed binary, which is what a plain `swift build` produces, is
+  refused by Gatekeeper once a browser download has set `com.apple.quarantine`,
+  and the launch agent then does not start.
+
+  The ticket is not stapled — `stapler` cannot staple a bare Mach-O — so a
+  quarantined copy is verified online on first run. A binary you build yourself
+  is never quarantined and needs none of this.
+
 ### Added
 
 - **`zac-watch-macos`: a standalone macOS appearance watcher** (`watchers/macos/`),
@@ -27,9 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     notification).
 - `make watcher`, `make watcher-install`, `make watcher-status`,
   `make watcher-uninstall`, `make watcher-clean`.
-- `bin/make-watcher`: builds a universal (arm64 + x86_64) release zip. The
-  release workflow gained a macOS job for it, and each release now carries a
-  fourth artifact, `zac-watch-macos-<tag>-macos-universal.zip`.
+- `bin/make-watcher`: builds a universal (arm64 + x86_64) release zip, and signs
+  the binary when `ZAC_CODESIGN_ID` is set (ad-hoc otherwise, the right default
+  for a local build). The release workflow gained a macOS job for it, with
+  keychain import, notarization and a smoke test of the signed binary — all
+  skipped, not failed, when the signing secrets are absent, so a fork can still
+  build the workflow. Each release now carries a fourth artifact,
+  `zac-watch-macos-<tag>-macos-universal.zip`.
+
+  A signed release needs four repository secrets: `CERTIFICATE_BASE64`,
+  `CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_ID_PASSWORD`.
 - README: "Option 3: the macOS launch agent" under *Watcher options*.
 
 ## [2.0.0] - 2026-08-17
