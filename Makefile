@@ -19,5 +19,11 @@ endif
 	@# Promote the [Unreleased] section of CHANGELOG.md to this version.
 	@# Fails when [Unreleased] is empty, so a release always has notes.
 	zsh -f bin/changelog release $(VERSION)
+	@# Commit the release edits first, so the tag points at them and not at the
+	@# previous commit.
+	git commit -m "chore: release v$(VERSION)" \
+		CHANGELOG.md \
+		editors/emacs/zac-theme-autodetection.el \
+		examples/tmux/catppuccin.conf
 	@# Create local git tag
 	git tag v$(VERSION)
