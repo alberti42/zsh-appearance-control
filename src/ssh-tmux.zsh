@@ -13,9 +13,9 @@
 # the default cache file directly.
 #
 # Limitations (see docs/design-tmux-independence.md):
-# - The remote file is machine-global, so it collides with the appearance of a
-#   user sitting at that machine. Per-connection scoping comes with the
-#   connection ID.
+# - The remote file is per user on that host, so all of that user's sessions
+#   there share one value: your ssh session and a session they started at the
+#   machine itself. Per-connection scoping comes with the connection ID.
 # - We assume the default remote cache path; a remote ZAC_CACHE_DIR is unknown
 #   to us.
 #

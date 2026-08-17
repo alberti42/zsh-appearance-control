@@ -17,7 +17,7 @@ A file, chosen by scope:
 
 | Scope | File | Read by |
 |---|---|---|
-| local machine | `$ZAC_CACHE_DIR/appearance` | shells with no connection ID |
+| per user on a host | `$ZAC_CACHE_DIR/appearance` | shells with no connection ID |
 | one ssh connection | `$ZAC_CACHE_DIR/appearance.<ID>` | shells carrying that ID |
 
 Benefits: no fork in `sync` (a builtin read replaces `tmux show-options`, which
