@@ -254,6 +254,17 @@ You can customize the remote tmux session name (default: `main`):
 export ZAC_SSH_TMUX_SESSION=main
 ```
 
+### What a remote session does and does not follow
+
+A remote host has no watcher of its own for your local appearance, so what happens depends on tmux:
+
+| Remote session | At connect | While the session stays open |
+|---|---|---|
+| With tmux 3.6 hooks on the remote host | correct | follows your local terminal, because the hook runs there |
+| Plain ssh, or older tmux | correct | stays as it was at connect |
+
+In other words, a plain ssh session gets the appearance you had when you connected, and keeps it. Reconnect to pick up a change. This is a deliberate limit: the alternative is a push channel back into the remote host, which we chose not to build (see `docs/design-tmux-independence.md`).
+
 ## Configuration
 
 Configuration is done with environment variables (set them before the plugin is loaded):
