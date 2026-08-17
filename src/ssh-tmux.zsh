@@ -2,11 +2,25 @@
 
 # ssh-tmux (optional extra).
 #
-# This command connects via SSH and ensures the remote tmux session has the
-# @dark_appearance option set to the current local appearance.
+# This command connects via SSH and hands the local appearance to the remote
+# host, then attaches to a tmux session there.
+#
+# The appearance travels through the remote ground truth file, never through a
+# tmux option: tmux is a consumer of the appearance, not a transport for it.
+#
+# On the remote host we prefer `appearance-dispatch`, because it also signals
+# the remote shells that are already running. If it is not installed, we write
+# the default cache file directly.
+#
+# Limitations (see docs/design-tmux-independence.md):
+# - The remote file is machine-global, so it collides with the appearance of a
+#   user sitting at that machine. Per-connection scoping comes with the
+#   connection ID.
+# - We assume the default remote cache path; a remote ZAC_CACHE_DIR is unknown
+#   to us.
 #
 # Safety:
-# - We do NOT send USR1 to remote processes.
+# - We do NOT send USR1 to remote processes ourselves.
 #   Signaling unknown processes is unsafe; remote shells may not have traps.
 
 function ssh-tmux() {
@@ -21,10 +35,20 @@ function ssh-tmux() {
 
   local session=${_zac[cfg.ssh_tmux_session]:-main}
 
-  # Pass the appearance to the remote tmux session.
-  # Note: use `\\;` so the remote shell receives a literal `\;`.
-  command ssh -t "$@" "tmux new-session -A -s ${session} \\; set-option -gq @dark_appearance ${dark_mode}"
+  # Remote snippet: POSIX syntax, so it runs under any login shell.
+  local remote_cmd
+  remote_cmd="d=\${XDG_CACHE_HOME:-\$HOME/.cache}/zac;"
+  remote_cmd+=" mkdir -p \"\$d\" && printf '%s\\n' ${dark_mode} > \"\$d/appearance\";"
+  remote_cmd+=" command -v appearance-dispatch >/dev/null 2>&1 &&"
+  remote_cmd+=" appearance-dispatch dispatch ${dark_mode} >/dev/null 2>&1;"
+  remote_cmd+=" exec tmux new-session -A -s ${session}"
+
+  command ssh -t "$@" "$remote_cmd"
 }
 
 # Enforce the same autocompletion for ssh-tmux as for ssh (when available).
 (( ${+functions[compdef]} )) && compdef ssh-tmux=ssh
+
+# Keep the module load status at 0: without compdef the line above returns 1,
+# and _zac.module.compile_and_source would report a bogus load failure.
+true

@@ -88,8 +88,7 @@ _zac.module.compile "${_zac[meta.plugin_dir]}/src/core.zsh"
 
 # Source hard dependencies (idempotent).
 #
-# src/platform/tmux.zsh is NOT a hard dependency: the ground truth is a file,
-# and the tmux fallback loads that module on demand.
+# The ground truth is a file, so there is no tmux module to load here.
 (( $+functions[_zac.dark_mode.query_ground_truth] )) || _zac.module.compile_and_source src/platform/ground_truth.zsh
 
 function _zac.init.config() {
