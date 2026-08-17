@@ -122,17 +122,16 @@ TRAPHUP()  { _release_lock_on_signal 1 }
 TRAPTERM() { _release_lock_on_signal 15 }
 TRAPEXIT() { [[ -n $_lock_held ]] && _release_lock "$_lock_held"; return 0 }
 
-function _signal_tmux_panes() {
-  command -v tmux >/dev/null 2>&1 || return 0
-  local pid comm
-  command tmux list-panes -a -F '#{pane_pid}' 2>/dev/null |
-    while IFS= read -r pid; do
-      [[ $pid == <-> ]] || continue
-      comm=$(command ps -p "$pid" -o comm= 2>/dev/null) || continue
-      [[ $comm == *zsh ]] || continue
-      command kill -USR1 "$pid" 2>/dev/null || true
-    done
-}
+# Removed on purpose: _signal_tmux_panes().
+#
+# It signalled every zsh found in `tmux list-panes -a`, whether or not the shell
+# had loaded the plugin. A shell that has no TRAPUSR1 yet is KILLED by USR1,
+# because terminate is the default action for that signal. That happened with
+# the tmux hooks client-dark-theme / client-light-theme: the hook fires on
+# attach, and the freshly started shell died before its turbo-loaded plugin had
+# installed the trap.
+#
+# Only the pid registry may be signalled: it is opt-in by construction.
 
 function _signal_pids_from_dir() {
   # Signal every registered shell in $pids_dir.
@@ -228,8 +227,7 @@ function _dispatch() {
   fi
   command chmod 600 -- "$appearance_file" 2>/dev/null || true
 
-  # Signal all shells.
-  _signal_tmux_panes
+  # Signal all registered shells (opt-in only, see above).
   _signal_pids_from_dir "$pids_dir"
 
   _release_lock "$lock_dir"
