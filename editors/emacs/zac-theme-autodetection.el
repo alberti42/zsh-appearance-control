@@ -3,7 +3,7 @@
 ;; Copyright (C) 2026 Andrea Alberti
 
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
-;; Version: 2.0.0
+;; Version: 2.1.0
 ;; Keywords: appearance theme dark-mode
 ;; URL: https://github.com/alberti42/zsh-appearance-control
 ;; Package-Requires: ((emacs "28.1"))

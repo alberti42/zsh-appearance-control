@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-17
+
 ### Security
 
 - **The released `zac-watch-macos` binary is signed and notarized.** It is built
@@ -171,7 +173,8 @@ No release notes were provided for this version.
 
 First release.
 
-[Unreleased]: https://github.com/alberti42/zsh-appearance-control/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/alberti42/zsh-appearance-control/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/alberti42/zsh-appearance-control/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/alberti42/zsh-appearance-control/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/alberti42/zsh-appearance-control/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/alberti42/zsh-appearance-control/compare/v1.0.1...v1.0.2
