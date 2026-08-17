@@ -11,7 +11,7 @@ setopt errexit nounset pipefail
 # - bin/ runtime helpers (appearance-dispatch, appearance-probe)
 # - README + LICENSE
 #
-# Build tools in bin/ (make-release-zip, make-extras) are excluded.
+# Build tools in bin/ (make-release-zip, make-extras, changelog) are excluded.
 
 function _usage() {
   print -r -- "usage: $1 <version-tag>" >&2
@@ -69,6 +69,7 @@ command rsync -a --delete \
   --exclude '*.ai' \
   --exclude 'bin/make-release-zip' \
   --exclude 'bin/make-extras' \
+  --exclude 'bin/changelog' \
   -- ${paths[@]} "$stage/"
 
 command rm -f -- "$zip_path" 2>/dev/null || true
