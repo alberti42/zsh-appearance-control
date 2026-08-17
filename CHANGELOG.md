@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- The `tmux` and `cache` sub-commands of `bin/appearance-dispatch`. They are
+  still accepted, and they run the same pipeline as `dispatch`, so only the
+  spelling differs. The name `tmux` is misleading: since 2.0.0 nothing in this
+  project sets a tmux option. Use `dispatch`.
+
 ## [2.1.0] - 2026-08-17
 
 ### Security

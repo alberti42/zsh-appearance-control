@@ -194,16 +194,16 @@ To pass `ZAC_IO_CMD` from a watcher that does not inherit your shell environment
 env ZAC_IO_CMD=/path/to/your/io-script bin/appearance-dispatch dispatch 1
 ```
 
-### Legacy: `tmux` and `cache`
+### Deprecated: `tmux` and `cache`
 
-The older two-call pattern is still supported for backward compatibility:
+The older two-call pattern is still accepted, so old watcher scripts keep working:
 
 ```
 bin/appearance-dispatch tmux <on|off|1|0|true|false>
 bin/appearance-dispatch cache <on|off|1|0|true|false>
 ```
 
-Both now call the same unified pipeline internally, so they behave identically to `dispatch`.
+Only the spelling survives. Both run the same unified pipeline as `dispatch`, so all three are interchangeable. In particular the sub-command named `tmux` does **not** set any tmux option any more; since 2.0.0 no part of this project does. Use `dispatch`.
 
 The dispatcher only signals shell processes that have opted in, that is, shells that loaded this plugin and registered themselves. This matters: `USR1` terminates a process that has no handler for it, so signalling an unrelated shell would kill it.
 
