@@ -14,7 +14,31 @@ permissions:
   contents: write
 
 jobs:
+  # The macOS watcher is a compiled artifact, so it needs a Darwin runner.
+  build-watcher:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build universal watcher binary
+        run: |
+          chmod +x bin/make-watcher
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            zsh -f bin/make-watcher "${{ inputs.tag }}"
+          else
+            zsh -f bin/make-watcher "${{ github.ref_name }}"
+          fi
+
+      - name: Upload watcher artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: watcher
+          path: dist/*.zip
+          if-no-files-found: error
+
   build-and-release:
+    needs: build-watcher
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,6 +61,12 @@ jobs:
             zsh -f bin/make-release-zip "${{ github.ref_name }}"
             zsh -f bin/make-extras "${{ github.ref_name }}"
           fi
+
+      - name: Download watcher artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: watcher
+          path: dist
 
       - name: Extract release notes from CHANGELOG.md
         run: |

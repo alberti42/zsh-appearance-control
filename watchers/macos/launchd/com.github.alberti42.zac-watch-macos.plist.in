@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template for the zac-watch-macos launch agent.
+
+  Placeholders (@…@) are substituted by `make watcher-install`:
+    @WATCHER_BIN@   absolute path to the zac-watch-macos binary
+    @DISPATCH_BIN@  absolute path to zsh-appearance-control/bin/appearance-dispatch
+    @IO_CMD@        absolute path to your ZAC_IO_CMD script, or empty for none
+    @PATH@          PATH for the agent and every process it spawns
+    @LOG_DIR@       directory for the agent's stdout/stderr log
+
+  Install by hand instead:
+    sed -e 's|@WATCHER_BIN@|/path/to/zac-watch-macos|' … template \
+      > ~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist
+    launchctl bootstrap gui/$(id -u) \
+      ~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.github.alberti42.zac-watch-macos</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>@WATCHER_BIN@</string>
+  </array>
+
+  <!--
+    The agent must live in the GUI session: the distributed notification for the
+    appearance change is not delivered to a background-session job.
+  -->
+  <key>LimitLoadToSessionType</key>
+  <string>Aqua</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Do not respawn faster than this if the agent exits. -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- It sleeps in a run loop; keep it out of the way of real work. -->
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Required: the only variable the watcher itself reads. -->
+    <key>ZAC_DISPATCH</key>
+    <string>@DISPATCH_BIN@</string>
+
+    <!--
+      Passed through to appearance-dispatch. Leave empty if you have no
+      heavy-I/O script. Must be a single executable; write a wrapper if you
+      need arguments.
+    -->
+    <key>ZAC_IO_CMD</key>
+    <string>@IO_CMD@</string>
+
+    <!--
+      launchd gives a job a bare PATH (/usr/bin:/bin:/usr/sbin:/sbin).
+      appearance-dispatch itself only needs that, but your ZAC_IO_CMD script
+      and its tools (tmux, vivid, …) usually need more. Note that a script with
+      a `#!/bin/zsh` shebang (without -f) also sources ~/.zshenv, which may
+      rebuild PATH on its own.
+    -->
+    <key>PATH</key>
+    <string>@PATH@</string>
+
+    <!-- Optional: uncomment to override the cache directory.
+    <key>ZAC_CACHE_DIR</key>
+    <string>/Users/you/.cache/zac</string>
+    -->
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/zac-watch-macos.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/zac-watch-macos.log</string>
+</dict>
+</plist>

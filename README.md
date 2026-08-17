@@ -287,6 +287,7 @@ The plugin does not detect appearance changes by itself. Something must call `bi
 |---|---|---|
 | tmux hooks | the theme of the attached terminal | you work inside tmux, also over ssh |
 | WezTerm hook | the OS appearance | you use WezTerm, with or without tmux |
+| `zac-watch-macos` launch agent | the OS appearance | macOS, any terminal, including the automatic sunset switch |
 | your own script or service | whatever you query | your terminal offers no hook |
 | manual `zac dark/light/toggle` | nothing, you decide | you switch by hand |
 
@@ -362,6 +363,37 @@ wezterm.on('window-config-reloaded', function(window, pane)
   window:set_config_overrides(overrides)
 end)
 ```
+
+### Option 3: the macOS launch agent (zac-watch-macos)
+
+A small Swift agent shipped in `watchers/macos/`. It observes the system
+appearance notification and calls the dispatcher, so it is terminal-agnostic:
+it works in Terminal.app, iTerm2, Ghostty, and it also fires when macOS switches
+appearance automatically at sunset.
+
+```zsh
+cd /path/to/zsh-appearance-control
+make watcher-install \
+  IO_CMD=$HOME/path/to/your/io-script          # optional
+```
+
+That builds the binary into `~/.local/bin`, writes
+`~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist`, and loads it
+in the `gui/` domain. The agent then runs
+`appearance-dispatch dispatch <0|1>` on every change, with `ZAC_IO_CMD`, `PATH`
+and any other variable taken from the plist.
+
+```zsh
+make watcher-status                       # is it loaded?
+tail -f ~/Library/Logs/zac-watch-macos.log
+make watcher-uninstall
+```
+
+A prebuilt universal binary is attached to each release as
+`zac-watch-macos-<tag>-macos-universal.zip`. See
+[`watchers/macos/README.md`](watchers/macos/README.md) for the full description,
+the environment variables (`ZAC_DISPATCH`, `ZAC_WATCH_DEBOUNCE_MS`,
+`ZAC_WATCH_RETRY_MS`), the `PATH` discussion and manual installation.
 
 ## tmux: theme switching with @dark_appearance
 

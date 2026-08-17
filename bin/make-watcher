@@ -1,0 +1,79 @@
+#!/usr/bin/env zsh
+
+emulate -LR zsh -o warn_create_global -o no_short_loops
+setopt errexit nounset pipefail
+
+# Build the macOS appearance watcher as a release artifact.
+#
+# Produces dist/zac-watch-macos-<tag>-macos-universal.zip containing:
+#   zac-watch-macos                       universal binary (arm64 + x86_64)
+#   com.github.alberti42.zac-watch-macos.plist.in   launchd template
+#   README.md                             install instructions
+#
+# Requires a macOS host with the Swift toolchain (Xcode command line tools).
+# The zsh plugin zip does not contain the watcher: it is a compiled, per-OS
+# artifact with its own lifecycle.
+
+function _usage() {
+  print -r -- "usage: $1 <version-tag>" >&2
+  print -r -- "example: $1 v0.1.0" >&2
+}
+
+local version=${1:-}
+if [[ -z $version ]]; then
+  _usage "${0:t}"
+  exit 2
+fi
+
+if [[ $(command uname -s) != Darwin ]]; then
+  print -r -- "${0:t}: macOS only (this artifact is a Darwin binary)" >&2
+  exit 1
+fi
+
+local repo_root
+repo_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
+  print -r -- "${0:t}: must run inside a git repository" >&2
+  exit 1
+}
+
+cd "$repo_root"
+
+local pkg_dir=watchers/macos
+local out_dir=dist
+command mkdir -p -- "$out_dir"
+
+# Universal binary: one artifact for Apple Silicon and Intel.
+( cd "$pkg_dir" && command swift build -c release --arch arm64 --arch x86_64 )
+
+local binary="$pkg_dir/.build/apple/Products/Release/zac-watch-macos"
+if [[ ! -x $binary ]]; then
+  print -r -- "${0:t}: build produced no binary at $binary" >&2
+  exit 1
+fi
+
+local plist="$pkg_dir/launchd/com.github.alberti42.zac-watch-macos.plist.in"
+local readme="$pkg_dir/README.md"
+local f
+for f in $plist $readme; do
+  [[ -f $f ]] || { print -r -- "${0:t}: missing file: $f" >&2; exit 1 }
+done
+
+local package_dir="zac-watch-macos-${version}-macos-universal"
+local zip_path="$out_dir/${package_dir}.zip"
+
+local tmp
+tmp=$(command mktemp -d 2>/dev/null || command mktemp -d -t zac-watcher)
+trap 'command rm -rf -- "$tmp" 2>/dev/null || true' EXIT
+
+local stage="$tmp/$package_dir"
+command mkdir -p -- "$stage"
+command cp -- "$binary" "$stage/zac-watch-macos"
+command cp -- "$plist" "$stage/${plist:t}"
+command cp -- "$readme" "$stage/README.md"
+# BSD chmod does not accept `--` after the mode.
+command chmod 755 "$stage/zac-watch-macos"
+
+command rm -f -- "$zip_path" 2>/dev/null || true
+(cd "$tmp" && zip -qr "$repo_root/$zip_path" "$package_dir")
+
+print -r -- "$zip_path"

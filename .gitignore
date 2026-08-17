@@ -4,3 +4,7 @@
 
 # Release artifacts
 dist/
+
+# SwiftPM build products (watchers/macos)
+.build/
+.swiftpm/

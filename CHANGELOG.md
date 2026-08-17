@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`zac-watch-macos`: a standalone macOS appearance watcher** (`watchers/macos/`),
+  a small Foundation-only Swift launch agent. It observes
+  `AppleInterfaceThemeChangedNotification`, re-reads `AppleInterfaceStyle`, and
+  calls `bin/appearance-dispatch dispatch <0|1>`. Terminal-agnostic, so it also
+  covers Terminal.app, iTerm2 and Ghostty, and it fires on the automatic sunset
+  switch. This closes the "no standalone watcher" gap.
+  - Reads one variable of its own, `ZAC_DISPATCH`; everything else
+    (`ZAC_IO_CMD`, `ZAC_CACHE_DIR`, `PATH`) is inherited by the dispatcher from
+    the launchd plist.
+  - Triggers are debounced (`ZAC_WATCH_DEBOUNCE_MS`, default 150 ms) and
+    dispatches serialized, so a burst of notifications produces one dispatch.
+  - A failed dispatch is retried once (`ZAC_WATCH_RETRY_MS`, default 3000 ms),
+    which is safe because a failed dispatch writes nothing and signals nobody.
+  - launchd plist template in `watchers/macos/launchd/`, with
+    `LimitLoadToSessionType = Aqua` (a background-session job never receives the
+    notification).
+- `make watcher`, `make watcher-install`, `make watcher-status`,
+  `make watcher-uninstall`, `make watcher-clean`.
+- `bin/make-watcher`: builds a universal (arm64 + x86_64) release zip. The
+  release workflow gained a macOS job for it, and each release now carries a
+  fourth artifact, `zac-watch-macos-<tag>-macos-universal.zip`.
+- README: "Option 3: the macOS launch agent" under *Watcher options*.
+
 ## [2.0.0] - 2026-08-17
 
 ### Removed
