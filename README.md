@@ -288,6 +288,7 @@ The plugin does not detect appearance changes by itself. Something must call `bi
 | tmux hooks | the theme of the attached terminal | you work inside tmux, also over ssh |
 | WezTerm hook | the OS appearance | you use WezTerm, with or without tmux |
 | `zac-watch-macos` launch agent | the OS appearance | macOS, any terminal, including the automatic sunset switch |
+| `zac-watch-linux` systemd service | the desktop colour scheme | GNOME 42+ / any desktop with the appearance portal |
 | your own script or service | whatever you query | your terminal offers no hook |
 | manual `zac dark/light/toggle` | nothing, you decide | you switch by hand |
 
@@ -394,6 +395,37 @@ A prebuilt universal binary is attached to each release as
 [`watchers/macos/README.md`](watchers/macos/README.md) for the full description,
 the environment variables (`ZAC_DISPATCH`, `ZAC_WATCH_DEBOUNCE_MS`,
 `ZAC_WATCH_RETRY_MS`), the `PATH` discussion and manual installation.
+
+### Option 4: the Linux systemd user service (zac-watch-linux)
+
+The Linux counterpart, in `watchers/linux/`. It is a zsh script — nothing to
+build — and it watches the desktop colour-scheme preference over D-Bus.
+
+Requires a desktop that has such a preference: **GNOME 42 or newer** (Ubuntu
+22.04+, Fedora 36+), or any desktop whose `xdg-desktop-portal` implements
+`org.freedesktop.appearance` (KDE Plasma 5.24+). It must run inside the
+graphical session, because both backends need the session D-Bus.
+
+```zsh
+cd /path/to/zsh-appearance-control
+make watcher-linux-install \
+  IO_CMD=$HOME/path/to/your/io-script          # optional
+```
+
+That installs `~/.local/bin/zac-watch-linux` and
+`~/.config/systemd/user/zac-watch-linux.service`, then enables and starts it.
+
+```zsh
+make watcher-linux-status
+journalctl --user -u zac-watch-linux -f
+make watcher-linux-uninstall
+```
+
+It prefers the `xdg-desktop-portal` backend and falls back to
+`gsettings monitor org.gnome.desktop.interface color-scheme`. Each release
+attaches it as `zac-watch-linux-<tag>.zip`. See
+[`watchers/linux/README.md`](watchers/linux/README.md) for the backends, the
+environment variables and the restart semantics.
 
 ## tmux: theme switching with @dark_appearance
 

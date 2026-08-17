@@ -1,0 +1,279 @@
+#!/usr/bin/env zsh
+
+emulate -LR zsh -o warn_create_global -o no_short_loops
+setopt extended_glob
+
+# zac-watch-linux — Linux appearance watcher for zsh-appearance-control.
+#
+# Version: 2.1.0
+#
+# A tiny systemd user service. It waits for the desktop to report a
+# light/dark change and calls `appearance-dispatch dispatch <0|1>`. It knows
+# nothing about the plugin, the cache file, tmux or ZAC_IO_CMD: everything
+# beyond "the appearance changed" is the dispatcher's business.
+#
+# This is the Linux counterpart of watchers/macos/zac-watch-macos and follows
+# the same three rules:
+#   1. The signal is only a TRIGGER. The value is always re-read afterwards,
+#      because a desktop can emit several signals for one change.
+#   2. Triggers are debounced, so a burst produces exactly one dispatch.
+#   3. The whole environment is inherited by the dispatcher. That is how
+#      ZAC_IO_CMD, ZAC_CACHE_DIR and PATH reach it: they are set in the systemd
+#      unit, not parsed here.
+#
+# Requirements: a desktop that reports a colour-scheme preference, which means
+# GNOME 42 or newer (Ubuntu 22.04+), or any desktop whose xdg-desktop-portal
+# implements org.freedesktop.appearance (KDE 5.24+, and others). Older desktops
+# have nothing to watch and are not supported.
+#
+# journald timestamps every line, so nothing is printed with a timestamp here.
+
+typeset -g PROGNAME=${0:t}
+typeset -g VERSION=2.1.0
+
+function _log()  { builtin print -r -- "$PROGNAME: $*" }
+function _err()  { builtin print -r -- "$PROGNAME: $*" >&2 }
+function _die()  { _err "$1"; exit ${2:-1} }
+
+function _usage() {
+  builtin print -r -- "usage: $PROGNAME [--once|--print|--version|--help]
+
+  (no option)  Watch for appearance changes until killed (systemd mode).
+  --once       Dispatch the current appearance once, then exit with the
+               dispatcher's exit status.
+  --print      Print the current appearance as 0 or 1, then exit.
+
+Environment:
+  ZAC_DISPATCH           Absolute path to bin/appearance-dispatch (required
+                         unless it is in PATH).
+  ZAC_WATCH_BACKEND      auto (default), portal, gsettings, or custom.
+  ZAC_WATCH_DEBOUNCE_MS  Coalescing window, default 200.
+  ZAC_WATCH_RETRY_MS     Delay before the single retry of a failed dispatch,
+                         default 3000. 0 disables the retry.
+  ZAC_WATCH_MONITOR_CMD  custom backend: command that prints one line per
+                         appearance change and never exits.
+  ZAC_WATCH_READ_CMD     custom backend: command that prints 1 (dark) or 0.
+
+Everything else in the environment (ZAC_IO_CMD, ZAC_CACHE_DIR, PATH, …) is
+passed through to the dispatcher unchanged."
+}
+
+# --- configuration -----------------------------------------------------------
+
+function _int_env() {
+  # $1 name, $2 default. Sets REPLY.
+  local raw=${(P)1:-}
+  typeset -g REPLY=$2
+  [[ $raw == <-> ]] && REPLY=$raw
+}
+
+function _resolve_dispatch() {
+  # ZAC_DISPATCH wins; the PATH lookup only helps interactive testing, since a
+  # systemd unit should always name an absolute path.
+  typeset -g DISPATCH
+  if [[ -n ${ZAC_DISPATCH:-} ]]; then
+    DISPATCH=${~ZAC_DISPATCH}
+    [[ -x $DISPATCH ]] || _die "ZAC_DISPATCH is not an executable file: $DISPATCH" 2
+    return 0
+  fi
+  DISPATCH=$(command -v appearance-dispatch 2>/dev/null) && [[ -n $DISPATCH ]] && return 0
+  _die "ZAC_DISPATCH is not set and appearance-dispatch was not found in PATH.
+Set ZAC_DISPATCH to the absolute path of zsh-appearance-control/bin/appearance-dispatch." 2
+}
+
+# --- backends ----------------------------------------------------------------
+#
+# Each backend is a pair: a MONITOR command that prints one line per change and
+# never exits, and a READ command that prints the current value. The monitor
+# line is never parsed for the value (rule 1).
+
+function _portal_read() {
+  # org.freedesktop.appearance color-scheme: 0 = no preference, 1 = prefer dark,
+  # 2 = prefer light. Both spellings of the portal method are tried, because
+  # ReadOne is the newer one and older portals only have Read.
+  local out
+  out=$(command gdbus call --session \
+          --dest org.freedesktop.portal.Desktop \
+          --object-path /org/freedesktop/portal/desktop \
+          --method org.freedesktop.portal.Settings.ReadOne \
+          org.freedesktop.appearance color-scheme 2>/dev/null) \
+    || out=$(command gdbus call --session \
+          --dest org.freedesktop.portal.Desktop \
+          --object-path /org/freedesktop/portal/desktop \
+          --method org.freedesktop.portal.Settings.Read \
+          org.freedesktop.appearance color-scheme 2>/dev/null) \
+    || return 1
+  [[ $out == *"uint32 1"* ]] && builtin print -r -- 1 || builtin print -r -- 0
+}
+
+function _gsettings_read() {
+  # 'prefer-dark' is dark; 'default' and 'prefer-light' are not. The same
+  # mapping as src/platform/linux-gnome.zsh — two answers to "is it dark" would
+  # be a second ground truth.
+  local v
+  v=$(command gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null) || return 1
+  [[ ${v//\'/} == prefer-dark ]] && builtin print -r -- 1 || builtin print -r -- 0
+}
+
+function _detect_backend() {
+  # Sets BACKEND, MONITOR_CMD (array) and READ_FN.
+  typeset -g BACKEND READ_FN
+  typeset -ga MONITOR_CMD
+
+  local want=${ZAC_WATCH_BACKEND:-auto}
+
+  if [[ $want == custom || ( $want == auto && -n ${ZAC_WATCH_MONITOR_CMD:-} ) ]]; then
+    [[ -n ${ZAC_WATCH_MONITOR_CMD:-} && -n ${ZAC_WATCH_READ_CMD:-} ]] \
+      || _die "the custom backend needs both ZAC_WATCH_MONITOR_CMD and ZAC_WATCH_READ_CMD" 2
+    BACKEND=custom
+    MONITOR_CMD=(${(z)ZAC_WATCH_MONITOR_CMD})
+    READ_FN=_custom_read
+    function _custom_read() { eval "${ZAC_WATCH_READ_CMD}" }
+    return 0
+  fi
+
+  # Both real backends need the session bus: the portal speaks over it, and
+  # dconf delivers gsettings change notifications over it. Checking here turns
+  # the common misconfiguration — the unit enabled outside the graphical
+  # session, or started from a plain ssh login — into one clear message instead
+  # of a watcher that runs and never fires. It also stops a Mac with Homebrew
+  # glib from looking like a usable desktop.
+  [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} || -S ${XDG_RUNTIME_DIR:-/nonexistent}/bus ]] \
+    || _die "no session D-Bus (DBUS_SESSION_BUS_ADDRESS is unset).
+This watcher must run inside the graphical session: bind the unit to
+graphical-session.target, not default.target." 3
+
+  # The portal is preferred: it is the cross-desktop interface, and it answers
+  # on GNOME as well as KDE.
+  if [[ $want == (auto|portal) ]] && (( $+commands[gdbus] )) && _portal_read >/dev/null; then
+    BACKEND=portal
+    MONITOR_CMD=(gdbus monitor --session
+                 --dest org.freedesktop.portal.Desktop
+                 --object-path /org/freedesktop/portal/desktop)
+    READ_FN=_portal_read
+    return 0
+  fi
+
+  if [[ $want == (auto|gsettings) ]] && (( $+commands[gsettings] )) && _gsettings_read >/dev/null; then
+    BACKEND=gsettings
+    MONITOR_CMD=(gsettings monitor org.gnome.desktop.interface color-scheme)
+    READ_FN=_gsettings_read
+    return 0
+  fi
+
+  _die "no usable backend (asked for: $want).
+Needs the xdg-desktop-portal org.freedesktop.appearance setting, or GNOME 42+
+with org.gnome.desktop.interface color-scheme. Is DBUS_SESSION_BUS_ADDRESS set?" 3
+}
+
+function _is_trigger() {
+  # True when a monitor line concerns the colour scheme. Everything else on the
+  # bus (accent colour, portal chatter, other gsettings keys) is ignored.
+  local line=$1
+  case $BACKEND in
+    portal)    [[ $line == *SettingChanged*color-scheme* ]] ;;
+    gsettings) [[ $line == color-scheme:* ]] ;;
+    *)         [[ -n $line ]] ;;
+  esac
+}
+
+# --- dispatch ----------------------------------------------------------------
+
+function _read_state() {
+  typeset -g REPLY
+  REPLY=$($READ_FN) || return 1
+  [[ $REPLY == (0|1) ]] || return 1
+}
+
+function _dispatch() {
+  # The environment is inherited as is.
+  command "$DISPATCH" dispatch "$1"
+}
+
+function _handle() {
+  # $1: reason, for the log. Uses/updates LAST_APPLIED.
+  local reason=$1 state
+  _read_state || { _err "$reason: cannot read the current appearance"; return 1 }
+  state=$REPLY
+
+  if [[ $state == ${LAST_APPLIED:-} ]]; then
+    _log "$reason: already ${${state/1/dark}/0/light}, skipped"
+    return 0
+  fi
+
+  if _dispatch "$state"; then
+    typeset -g LAST_APPLIED=$state
+    _log "$reason: dispatched ${state} (${${state/1/dark}/0/light})"
+    return 0
+  fi
+
+  # A failed dispatch wrote no ground truth and signalled no shell, so retrying
+  # is safe. Once only: a genuinely broken ZAC_IO_CMD must not become a loop.
+  _err "$reason: dispatcher failed"
+  typeset -g LAST_APPLIED=''
+  (( RETRY_MS > 0 )) || return 1
+  command sleep $(( RETRY_MS / 1000.0 ))
+  _read_state || return 1
+  if _dispatch "$REPLY"; then
+    typeset -g LAST_APPLIED=$REPLY
+    _log "$reason (retry): dispatched ${REPLY}"
+    return 0
+  fi
+  _err "$reason (retry): dispatcher failed again"
+  return 1
+}
+
+# --- main --------------------------------------------------------------------
+
+typeset -g LAST_APPLIED=''
+typeset -g DEBOUNCE_S RETRY_MS
+
+_int_env ZAC_WATCH_DEBOUNCE_MS 200; DEBOUNCE_S=$(( REPLY / 1000.0 ))
+_int_env ZAC_WATCH_RETRY_MS   3000; RETRY_MS=$REPLY
+
+case ${1:-} in
+  --help|-h) _usage; exit 0 ;;
+  --version) builtin print -r -- "$PROGNAME $VERSION"; exit 0 ;;
+  --print)   _detect_backend; _read_state || _die "cannot read the current appearance"
+             builtin print -r -- "$REPLY"; exit 0 ;;
+  --once)    _resolve_dispatch; _detect_backend
+             _read_state || _die "cannot read the current appearance"
+             _dispatch "$REPLY"; exit $? ;;
+  '')        ;;
+  *)         _err "unknown argument: $1"; _usage >&2; exit 2 ;;
+esac
+
+_resolve_dispatch
+_detect_backend
+
+# systemd stops the whole cgroup, but a plain SIGTERM in a terminal must also
+# take the monitor down with us.
+TRAPTERM() { exit 0 }
+TRAPINT()  { exit 0 }
+TRAPHUP()  { exit 0 }
+TRAPEXIT() { [[ -n ${MONITOR_PID:-} ]] && command kill $MONITOR_PID 2>/dev/null; return 0 }
+
+_log "watching (backend: $BACKEND, dispatcher: $DISPATCH)"
+
+# Sync at start: the service starts with the session, and the appearance may
+# have changed while it was not running.
+_handle startup
+
+# The monitor is a coprocess so that `read -p -t` can both wait for a trigger
+# and drain a burst.
+coproc "${MONITOR_CMD[@]}"
+typeset -g MONITOR_PID=$!
+
+typeset -g line
+while read -r -p line; do
+  _is_trigger "$line" || continue
+  # Drain the burst: every further line inside the window is the same change.
+  # `-t` takes its argument in the same word.
+  while read -r -p -t$DEBOUNCE_S line; do : ; done
+  _handle change
+done
+
+# The monitor exited: the session bus went away, or the desktop portal was
+# restarted. Fail, and let systemd restart the service (Restart=always).
+_err "the monitor exited; giving up so systemd can restart us"
+exit 1

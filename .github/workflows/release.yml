@@ -153,14 +153,16 @@ jobs:
 
       - name: Build release zip
         run: |
-          chmod +x bin/make-release-zip bin/make-extras
+          chmod +x bin/make-release-zip bin/make-extras bin/make-watcher-linux
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            zsh -f bin/make-release-zip "${{ inputs.tag }}"
-            zsh -f bin/make-extras "${{ inputs.tag }}"
+            TAG="${{ inputs.tag }}"
           else
-            zsh -f bin/make-release-zip "${{ github.ref_name }}"
-            zsh -f bin/make-extras "${{ github.ref_name }}"
+            TAG="${{ github.ref_name }}"
           fi
+          zsh -f bin/make-release-zip "$TAG"
+          zsh -f bin/make-extras "$TAG"
+          # The Linux watcher is a script: no compiler, no extra runner.
+          zsh -f bin/make-watcher-linux "$TAG"
 
       - name: Download watcher artifact
         uses: actions/download-artifact@v4

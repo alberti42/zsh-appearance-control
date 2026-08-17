@@ -14,7 +14,18 @@ AGENT_PATH   ?= /opt/homebrew/bin:/usr/local/bin:$(HOME)/.local/bin:/usr/bin:/bi
 LOG_DIR     ?= $(HOME)/Library/Logs
 PLIST_DEST   := $(HOME)/Library/LaunchAgents/$(WATCHER_LABEL).plist
 
-.PHONY: bump-version watcher watcher-install watcher-uninstall watcher-status watcher-clean
+# --- Linux/GNOME appearance watcher (watchers/linux) ---
+#
+# A script, so there is nothing to build: install is the only target.
+WATCHER_LINUX_DIR  := watchers/linux
+WATCHER_LINUX_BIN  := $(WATCHER_LINUX_DIR)/zac-watch-linux
+WATCHER_LINUX_UNIT := zac-watch-linux.service
+WATCHER_LINUX_UNIT_IN := $(WATCHER_LINUX_DIR)/systemd/$(WATCHER_LINUX_UNIT).in
+UNIT_DEST := $(HOME)/.config/systemd/user/$(WATCHER_LINUX_UNIT)
+LINUX_PATH ?= $(HOME)/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+.PHONY: bump-version watcher watcher-install watcher-uninstall watcher-status watcher-clean \
+	watcher-linux-install watcher-linux-uninstall watcher-linux-status
 
 watcher:
 	cd $(WATCHER_DIR) && swift build -c release
@@ -43,6 +54,28 @@ watcher-status:
 watcher-clean:
 	rm -rf $(WATCHER_DIR)/.build
 
+watcher-linux-install:
+	@[ "$$(uname -s)" = Linux ] || { echo "watcher-linux-install: Linux only"; exit 1; }
+	install -d $(PREFIX)/bin $(HOME)/.config/systemd/user
+	install -m 755 $(WATCHER_LINUX_BIN) $(PREFIX)/bin/zac-watch-linux
+	sed -e 's|@WATCHER_BIN@|$(PREFIX)/bin/zac-watch-linux|g' \
+	    -e 's|@DISPATCH_BIN@|$(DISPATCH_BIN)|g' \
+	    -e 's|@IO_CMD@|$(IO_CMD)|g' \
+	    -e 's|@PATH@|$(LINUX_PATH)|g' \
+	    $(WATCHER_LINUX_UNIT_IN) > $(UNIT_DEST)
+	systemctl --user daemon-reload
+	systemctl --user reenable $(WATCHER_LINUX_UNIT)
+	systemctl --user restart $(WATCHER_LINUX_UNIT)
+	@printf 'installed %s\nlog: journalctl --user -u %s -f\n' "$(UNIT_DEST)" "$(WATCHER_LINUX_UNIT)"
+
+watcher-linux-uninstall:
+	-systemctl --user disable --now $(WATCHER_LINUX_UNIT)
+	rm -f $(UNIT_DEST) $(PREFIX)/bin/zac-watch-linux
+	systemctl --user daemon-reload
+
+watcher-linux-status:
+	systemctl --user status $(WATCHER_LINUX_UNIT) --no-pager | head -20
+
 bump-version:
 ifndef VERSION
 	$(error VERSION is not set. Usage: make bump-version VERSION=x.y.z)
@@ -66,6 +99,12 @@ endif
 		> $(WATCHER_DIR)/Sources/zac-watch-macos/main.swift.tmp
 	mv $(WATCHER_DIR)/Sources/zac-watch-macos/main.swift.tmp \
 		$(WATCHER_DIR)/Sources/zac-watch-macos/main.swift
+	@# Update the version in the Linux watcher (header comment + constant)
+	sed -e 's|^# Version: .*$$|# Version: $(VERSION)|' \
+		-e 's|^typeset -g VERSION=.*$$|typeset -g VERSION=$(VERSION)|' \
+		$(WATCHER_LINUX_BIN) > $(WATCHER_LINUX_BIN).tmp
+	mv $(WATCHER_LINUX_BIN).tmp $(WATCHER_LINUX_BIN)
+	chmod 755 $(WATCHER_LINUX_BIN)
 	@# Promote the [Unreleased] section of CHANGELOG.md to this version.
 	@# Fails when [Unreleased] is empty, so a release always has notes.
 	zsh -f bin/changelog release $(VERSION)
@@ -75,6 +114,7 @@ endif
 		CHANGELOG.md \
 		editors/emacs/zac-theme-autodetection.el \
 		examples/tmux/catppuccin.conf \
-		$(WATCHER_DIR)/Sources/zac-watch-macos/main.swift
+		$(WATCHER_DIR)/Sources/zac-watch-macos/main.swift \
+		$(WATCHER_LINUX_BIN)
 	@# Create local git tag
 	git tag v$(VERSION)

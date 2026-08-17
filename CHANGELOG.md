@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`zac-watch-linux`: a standalone Linux appearance watcher**
+  (`watchers/linux/`), a systemd **user** service that watches the desktop
+  colour-scheme preference and calls `bin/appearance-dispatch dispatch <0|1>`.
+  The counterpart of `zac-watch-macos`, and the same three rules: the D-Bus
+  signal is a trigger and the value is always re-read, triggers are debounced
+  (`ZAC_WATCH_DEBOUNCE_MS`, default 200 ms) so a burst yields one dispatch, and
+  the environment is inherited by the dispatcher rather than parsed.
+  - A zsh script, not a compiled binary: nothing to build, nothing to sign, and
+    one artifact for every distribution and architecture.
+  - Two auto-detected backends: `xdg-desktop-portal`
+    (`org.freedesktop.appearance color-scheme`, preferred, works on KDE too) and
+    `gsettings monitor org.gnome.desktop.interface color-scheme`. A `custom`
+    backend (`ZAC_WATCH_MONITOR_CMD` / `ZAC_WATCH_READ_CMD`) covers an unusual
+    desktop, and doubles as the test harness.
+  - The dark mapping is the plugin's existing one: `prefer-dark` (portal `1`) is
+    dark, `default`, `prefer-light` and portal `0`/`2` are light.
+  - Refuses to start without a session D-Bus, instead of running and never
+    firing. The unit is bound to `graphical-session.target` for the same reason.
+  - When its monitor dies (bus or portal restarted) it exits non-zero and lets
+    systemd restart it; `StartLimitBurst=5` per minute stops a broken setup from
+    spinning. A failed dispatch is retried once, as on macOS.
+  - **Requires GNOME 42+ (Ubuntu 22.04+, Fedora 36+) or a desktop whose
+    `xdg-desktop-portal` implements `org.freedesktop.appearance`** (KDE Plasma
+    5.24+). Older desktops have no preference to watch and are not supported.
+- `make watcher-linux-install`, `make watcher-linux-status`,
+  `make watcher-linux-uninstall`, and `bin/make-watcher-linux`, which packages
+  the script, the unit template and the README as `zac-watch-linux-<tag>.zip`.
+  Built by the existing Linux job — no new runner. Each release now carries five
+  artifacts.
+- README: "Option 4: the Linux systemd user service" under *Watcher options*.
+
 ### Deprecated
 
 - The `tmux` and `cache` sub-commands of `bin/appearance-dispatch`. They are

@@ -1,0 +1,48 @@
+# Template for the zac-watch-linux systemd user service.
+#
+# Placeholders (@…@) are substituted by `make watcher-linux-install`:
+#   @WATCHER_BIN@   absolute path to the zac-watch-linux script
+#   @DISPATCH_BIN@  absolute path to zsh-appearance-control/bin/appearance-dispatch
+#   @IO_CMD@        absolute path to your ZAC_IO_CMD script, or empty for none
+#   @PATH@          PATH for the service and every process it spawns
+#
+# Install by hand instead:
+#   sed -e 's|@WATCHER_BIN@|/path/to/zac-watch-linux|' … template \
+#     > ~/.config/systemd/user/zac-watch-linux.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now zac-watch-linux.service
+
+[Unit]
+Description=Appearance watcher for zsh-appearance-control
+Documentation=https://github.com/alberti42/zsh-appearance-control
+# Bound to the graphical session, not to default.target: both backends need the
+# session D-Bus, so a service started by a plain ssh login could never fire.
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@WATCHER_BIN@
+
+# The watcher reads only ZAC_DISPATCH. Everything else here is inherited by
+# appearance-dispatch, which is how ZAC_IO_CMD and PATH reach it.
+Environment=ZAC_DISPATCH=@DISPATCH_BIN@
+Environment=ZAC_IO_CMD=@IO_CMD@
+Environment=PATH=@PATH@
+# Optional: uncomment to override the cache directory.
+#Environment=ZAC_CACHE_DIR=%h/.cache/zac
+
+# The watcher exits non-zero when its monitor dies (session bus restarted, or
+# the portal was restarted), and expects to be restarted.
+Restart=always
+RestartSec=5
+# But a broken setup must not spin: five restarts a minute, then stop and stay
+# stopped until someone looks at the journal.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# It sleeps waiting on a bus signal; keep it out of the way of real work.
+Nice=5
+
+[Install]
+WantedBy=graphical-session.target
