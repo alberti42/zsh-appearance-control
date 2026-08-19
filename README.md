@@ -624,6 +624,23 @@ Define and register this hook **before** loading `zac-theme-autodetection.el` so
 
 Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch dispatch ...`), Emacs will follow along.
 
+## Goodies: a complete real-world setup
+
+Everything above documents one extension point at a time. If you would rather see
+them all working together, [`examples/dotfiles/`](examples/dotfiles/) holds the
+author's actual configuration — a snapshot from a private dotfiles repository,
+warts included:
+
+| File | Role |
+|---|---|
+| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load with turbo mode, state primed at load time, and a `ZAC_IMMEDIATE_CALLBACK_FNC` that stays inside the "assignments only" rule (`LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight`, completion colours) |
+| [`zac-io-cmd.zsh`](examples/dotfiles/zac-io-cmd.zsh) | a `ZAC_IO_CMD` that rewrites configs for yazi, btop, patina, claude, opencode and IPython, flips the vivid `LS_COLORS` and git-theme symlinks, and — the part worth copying — treats "this tool is not installed here" as a skip rather than a failure, because a non-zero exit aborts the whole dispatch |
+| [`zac-tmux-cmd.zsh`](examples/dotfiles/zac-tmux-cmd.zsh) | the tmux options that live in the server's memory, in one helper shared by the io script and by `tmux.conf` at server start |
+
+These are reading material, not a drop-in: they assume that repository's paths,
+helpers and tool list. See [`examples/dotfiles/README.md`](examples/dotfiles/README.md)
+for what to copy, what to replace, and how the three fit together.
+
 ## Author
 - **Author:** Andrea Alberti
 - **GitHub Profile:** [alberti42](https://github.com/alberti42)

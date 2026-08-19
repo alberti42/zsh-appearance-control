@@ -63,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Built by the existing Linux job — no new runner. Each release now carries five
   artifacts.
 - README: "Option 4: the Linux systemd user service" under *Watcher options*.
+- **`examples/dotfiles/`: a complete real-world setup** — the author's own
+  `zac.zsh` (zinit load plus an inline callback that stays inside the
+  "assignments only" rule), `zac-io-cmd.zsh` (a `ZAC_IO_CMD` themeing a dozen
+  tools, treating "not installed here" as a skip rather than an abort) and
+  `zac-tmux-cmd.zsh` (the tmux options that live in the server, shared by the io
+  script and `tmux.conf`). Snapshots with a header saying what each demonstrates,
+  what to replace, and when it was taken; not refreshed automatically and not
+  part of any release artifact. Linked from the README as *Goodies*.
 
 ### Deprecated
 
