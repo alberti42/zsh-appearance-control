@@ -20,6 +20,13 @@ Documentation=https://github.com/alberti42/zsh-appearance-control
 PartOf=graphical-session.target
 After=graphical-session.target
 
+# StartLimit* live in [Unit], not in [Service] — systemd moved them long ago and
+# warns "Unknown key name" when they appear under [Service], where they are then
+# silently ignored. A broken setup must not spin: five starts a minute, then
+# stop and stay stopped until someone reads the journal.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
 [Service]
 Type=simple
 ExecStart=@WATCHER_BIN@
@@ -36,10 +43,6 @@ Environment=PATH=@PATH@
 # the portal was restarted), and expects to be restarted.
 Restart=always
 RestartSec=5
-# But a broken setup must not spin: five restarts a minute, then stop and stay
-# stopped until someone looks at the journal.
-StartLimitIntervalSec=60
-StartLimitBurst=5
 
 # It sleeps waiting on a bus signal; keep it out of the way of real work.
 Nice=5

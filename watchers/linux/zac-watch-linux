@@ -91,13 +91,18 @@ function _portal_read() {
   # org.freedesktop.appearance color-scheme: 0 = no preference, 1 = prefer dark,
   # 2 = prefer light. Both spellings of the portal method are tried, because
   # ReadOne is the newer one and older portals only have Read.
+  #
+  # The timeout is not decoration. gdbus waits 25 s by default, and when the
+  # portal is not up yet — which is the normal state a second after login, when
+  # this service starts — the two probes together delayed the first dispatch by
+  # 56 s on a real machine before falling back to gsettings.
   local out
-  out=$(command gdbus call --session \
+  out=$(command gdbus call --session --timeout $PORTAL_TIMEOUT_S \
           --dest org.freedesktop.portal.Desktop \
           --object-path /org/freedesktop/portal/desktop \
           --method org.freedesktop.portal.Settings.ReadOne \
           org.freedesktop.appearance color-scheme 2>/dev/null) \
-    || out=$(command gdbus call --session \
+    || out=$(command gdbus call --session --timeout $PORTAL_TIMEOUT_S \
           --dest org.freedesktop.portal.Desktop \
           --object-path /org/freedesktop/portal/desktop \
           --method org.freedesktop.portal.Settings.Read \
@@ -115,8 +120,9 @@ function _gsettings_read() {
   [[ ${v//\'/} == prefer-dark ]] && builtin print -r -- 1 || builtin print -r -- 0
 }
 
-function _detect_backend() {
-  # Sets BACKEND, MONITOR_CMD (array) and READ_FN.
+function _try_backends() {
+  # One detection pass. Sets BACKEND, MONITOR_CMD (array) and READ_FN.
+  # Returns non-zero when nothing answered, so the caller can retry.
   typeset -g BACKEND READ_FN
   typeset -ga MONITOR_CMD
 
@@ -153,6 +159,8 @@ graphical-session.target, not default.target." 3
     READ_FN=_portal_read
     return 0
   fi
+  [[ $want == auto ]] && (( $+commands[gdbus] )) \
+    && _log "the appearance portal did not answer; trying gsettings"
 
   if [[ $want == (auto|gsettings) ]] && (( $+commands[gsettings] )) && _gsettings_read >/dev/null; then
     BACKEND=gsettings
@@ -161,7 +169,23 @@ graphical-session.target, not default.target." 3
     return 0
   fi
 
-  _die "no usable backend (asked for: $want).
+  return 1
+}
+
+function _detect_backend() {
+  # Nothing answering at all is usually a session that is still coming up: the
+  # portal is D-Bus activated and GNOME's settings daemon starts around the same
+  # time as this service. Retry a few times before giving up, rather than dying
+  # and burning through the unit's start limit.
+  local -i try
+  for (( try = 1; try <= DETECT_TRIES; try++ )); do
+    _try_backends && return 0
+    (( try < DETECT_TRIES )) || break
+    _log "no backend yet (attempt $try/$DETECT_TRIES); waiting ${DETECT_WAIT_S}s"
+    command sleep $DETECT_WAIT_S
+  done
+
+  _die "no usable backend (asked for: ${ZAC_WATCH_BACKEND:-auto}).
 Needs the xdg-desktop-portal org.freedesktop.appearance setting, or GNOME 42+
 with org.gnome.desktop.interface color-scheme. Is DBUS_SESSION_BUS_ADDRESS set?" 3
 }
@@ -226,10 +250,14 @@ function _handle() {
 # --- main --------------------------------------------------------------------
 
 typeset -g LAST_APPLIED=''
-typeset -g DEBOUNCE_S RETRY_MS
+typeset -g DEBOUNCE_S RETRY_MS PORTAL_TIMEOUT_S
+typeset -gi DETECT_TRIES DETECT_WAIT_S
 
 _int_env ZAC_WATCH_DEBOUNCE_MS 200; DEBOUNCE_S=$(( REPLY / 1000.0 ))
 _int_env ZAC_WATCH_RETRY_MS   3000; RETRY_MS=$REPLY
+_int_env ZAC_WATCH_PORTAL_TIMEOUT_MS 3000; PORTAL_TIMEOUT_S=$(( REPLY / 1000.0 ))
+_int_env ZAC_WATCH_DETECT_TRIES  5; DETECT_TRIES=$REPLY
+_int_env ZAC_WATCH_DETECT_WAIT_S 3; DETECT_WAIT_S=$REPLY
 
 case ${1:-} in
   --help|-h) _usage; exit 0 ;;

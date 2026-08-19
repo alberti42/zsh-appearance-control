@@ -106,6 +106,9 @@ The watcher reads only these:
 | `ZAC_WATCH_RETRY_MS` | `3000` | delay before the single retry of a failed dispatch; `0` disables it |
 | `ZAC_WATCH_MONITOR_CMD` | — | custom backend: prints one line per change, never exits |
 | `ZAC_WATCH_READ_CMD` | — | custom backend: prints `1` or `0` |
+| `ZAC_WATCH_PORTAL_TIMEOUT_MS` | `3000` | timeout of a portal call. `gdbus` waits 25 s by default, which makes the fallback to `gsettings` look like a hang at login |
+| `ZAC_WATCH_DETECT_TRIES` | `5` | detection passes before giving up |
+| `ZAC_WATCH_DETECT_WAIT_S` | `3` | wait between detection passes |
 
 Everything else is inherited by the dispatcher unchanged. Set `ZAC_IO_CMD`,
 `ZAC_CACHE_DIR` and `PATH` in the unit, not on the watcher's command line.
@@ -143,6 +146,18 @@ Common outcomes:
   and `gsettings get org.gnome.desktop.interface color-scheme` by hand.
 - the log says `already dark, skipped` — a trigger arrived but the value did not
   change. Normal: accent-colour and theme changes also touch these settings.
+- *the appearance portal did not answer; trying gsettings* — the portal is D-Bus
+  activated and is often not up yet a second after login, which is exactly when
+  this service starts. On GNOME the `gsettings` backend is equivalent, so this is
+  harmless; force `ZAC_WATCH_BACKEND=portal` if you want the service to wait for
+  the portal instead (it will retry `ZAC_WATCH_DETECT_TRIES` times).
+- *no backend yet (attempt n/5)* — the session is still coming up. The watcher
+  retries rather than dying, so it does not burn the unit's start limit during a
+  slow login.
+- `ZAC_IO_CMD failed; aborting` in the journal is **your** io script failing, not
+  the watcher: the dispatcher then writes no ground truth and signals no shell,
+  by design. A script shared with macOS often needs guards on Linux — check that
+  every file it rewrites exists on this host.
 
 The `custom` backend is also the test harness: point it at a script that prints
 a line per change and another that prints the state, and the whole loop can be

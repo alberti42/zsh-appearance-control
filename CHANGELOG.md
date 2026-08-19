@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     dark, `default`, `prefer-light` and portal `0`/`2` are light.
   - Refuses to start without a session D-Bus, instead of running and never
     firing. The unit is bound to `graphical-session.target` for the same reason.
+  - Portal calls carry a short timeout (`ZAC_WATCH_PORTAL_TIMEOUT_MS`, default
+    3000). `gdbus` waits 25 s by default, and the portal is usually not up yet a
+    second after login, when this service starts — which delayed the first
+    dispatch by 56 s on a real Ubuntu session before it fell back to gsettings.
+  - Detection is retried (`ZAC_WATCH_DETECT_TRIES`, `ZAC_WATCH_DETECT_WAIT_S`)
+    when nothing answers, since a session that is still coming up is the usual
+    reason; dying instead would eat the unit's start limit during a slow login.
+  - Verified on Ubuntu with GNOME: one dispatch per toggle, both backends
+    agreeing on the value.
   - When its monitor dies (bus or portal restarted) it exits non-zero and lets
     systemd restart it; `StartLimitBurst=5` per minute stops a broken setup from
     spinning. A failed dispatch is retried once, as on macOS.
