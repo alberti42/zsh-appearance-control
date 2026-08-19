@@ -53,6 +53,48 @@ as on macOS: a desktop may emit several signals per change, and Ubuntu's accent
 colour changes touch neighbouring keys. Triggers are coalesced
 (`ZAC_WATCH_DEBOUNCE_MS`, default 200 ms), so a burst yields one dispatch.
 
+## Which launcher: systemd or XDG autostart?
+
+Ask your session:
+
+```zsh
+systemctl --user is-active graphical-session.target
+```
+
+| Answer | Use | Why |
+|---|---|---|
+| `active` | the **systemd** unit (`make watcher-linux-install`) | the session is integrated with `systemd --user`: one bus, supervision, journal, restart-on-failure |
+| `inactive` | the **autostart** entry (`make watcher-linux-autostart-install`) | nothing would ever start the unit, and the session has its own D-Bus |
+
+A plain local GNOME or KDE login gives `active`. An **NX/NoMachine, xrdp or VNC**
+session usually gives `inactive`, and there it also runs its **own D-Bus daemon**
+(socket in `/tmp`, not `/run/user/$UID/bus`). Two consequences, both of which look
+like "the watcher is broken":
+
+- `WantedBy=graphical-session.target` never fires, so the unit does not start at
+  login even though `systemctl --user enable` succeeded;
+- a unit that *is* started talks to the systemd bus, not the session bus, so it
+  reads the right value at startup and is never told about a change.
+
+The autostart entry avoids both: the session launches it, so it inherits that
+session's bus and `DISPLAY` by construction, and it is re-launched per session —
+which matters because the `/tmp` socket path changes with every login.
+
+If you would rather keep systemd on such a session, you must hand it the address
+after every login:
+
+```zsh
+systemctl --user import-environment DBUS_SESSION_BUS_ADDRESS DISPLAY XAUTHORITY
+systemctl --user restart zac-watch-linux.service
+```
+
+(`dbus-update-activation-environment --systemd` does *not* work there: it reaches
+systemd through the session bus, where systemd is not listening — the error is
+`Method "SetEnvironment" … doesn't exist`.)
+
+The watcher checks this at startup and warns when the desktop's bus differs from
+its own, so the failure announces itself in the log rather than being silent.
+
 ## Install
 
 From the repository root:
@@ -71,6 +113,19 @@ make watcher-linux-status        # systemctl --user status
 make watcher-linux-uninstall     # disable and remove
 journalctl --user -u zac-watch-linux -f
 ```
+
+Or, for a session that is not systemd-integrated (see above):
+
+```zsh
+make watcher-linux-autostart-install \
+  IO_CMD=$HOME/path/to/your/io-script
+make watcher-linux-autostart-uninstall
+```
+
+The autostart entry writes `~/.config/autostart/zac-watch-linux.desktop` and
+takes effect at the next login; its output goes to the session error log
+(`~/.xsession-errors` on X11), so debug by running the watcher in the foreground.
+Do not install both launchers at once.
 
 Overrides, same names as the macOS target:
 

@@ -8,6 +8,8 @@ setopt errexit nounset pipefail
 # Produces dist/zac-watch-linux-<tag>.zip containing:
 #   zac-watch-linux                 the watcher script (mode 755)
 #   zac-watch-linux.service.in      systemd user unit template
+#   zac-watch-linux.desktop.in      XDG autostart template (for sessions that
+#                                   are not integrated with systemd --user)
 #   README.md                       install instructions
 #
 # Nothing is compiled: this is a zsh script, so the artifact is portable across
@@ -42,10 +44,11 @@ command mkdir -p -- "$out_dir"
 
 local script="$pkg_dir/zac-watch-linux"
 local unit="$pkg_dir/systemd/zac-watch-linux.service.in"
+local desktop="$pkg_dir/autostart/zac-watch-linux.desktop.in"
 local readme="$pkg_dir/README.md"
 
 local f
-for f in $script $unit $readme; do
+for f in $script $unit $desktop $readme; do
   [[ -f $f ]] || { print -r -- "${0:t}: missing file: $f" >&2; exit 1 }
 done
 
@@ -67,6 +70,7 @@ local stage="$tmp/$package_dir"
 command mkdir -p -- "$stage"
 command cp -- "$script" "$stage/zac-watch-linux"
 command cp -- "$unit" "$stage/${unit:t}"
+command cp -- "$desktop" "$stage/${desktop:t}"
 command cp -- "$readme" "$stage/README.md"
 # BSD chmod does not accept `--` after the mode.
 command chmod 755 "$stage/zac-watch-linux"

@@ -1,0 +1,32 @@
+[Desktop Entry]
+# XDG autostart entry for zac-watch-linux.
+#
+# Use this INSTEAD of the systemd unit on a desktop session that is not
+# integrated with `systemd --user` — an NX/NoMachine, xrdp or VNC session, where
+# `systemctl --user is-active graphical-session.target` says `inactive` and the
+# session runs its own D-Bus daemon (socket in /tmp rather than
+# /run/user/$UID/bus).
+#
+# The session itself launches this entry, so the watcher inherits that session's
+# DBUS_SESSION_BUS_ADDRESS and DISPLAY by construction — which is the whole
+# point: with systemd the address has to be imported by hand after every login,
+# because it changes with every session.
+#
+# Placeholders (@…@) are substituted by `make watcher-linux-autostart-install`:
+#   @WATCHER_BIN@   absolute path to the zac-watch-linux script
+#   @DISPATCH_BIN@  absolute path to zsh-appearance-control/bin/appearance-dispatch
+#   @IO_CMD@        absolute path to your ZAC_IO_CMD script, or empty for none
+#   @PATH@          PATH for the watcher and every process it spawns
+#
+# No shell and no redirection here on purpose: Desktop Entry quoting rules are
+# their own dialect, and a mis-quoted Exec fails silently. Output therefore goes
+# to the session's error log (~/.xsession-errors on an X11 session); to watch the
+# watcher, run it in the foreground instead.
+Type=Application
+Version=1.0
+Name=zsh-appearance-control watcher
+Comment=Dispatch light/dark changes to zsh shells
+Exec=env ZAC_DISPATCH=@DISPATCH_BIN@ ZAC_IO_CMD=@IO_CMD@ PATH=@PATH@ @WATCHER_BIN@
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

@@ -22,10 +22,13 @@ WATCHER_LINUX_BIN  := $(WATCHER_LINUX_DIR)/zac-watch-linux
 WATCHER_LINUX_UNIT := zac-watch-linux.service
 WATCHER_LINUX_UNIT_IN := $(WATCHER_LINUX_DIR)/systemd/$(WATCHER_LINUX_UNIT).in
 UNIT_DEST := $(HOME)/.config/systemd/user/$(WATCHER_LINUX_UNIT)
+WATCHER_LINUX_DESKTOP_IN := $(WATCHER_LINUX_DIR)/autostart/zac-watch-linux.desktop.in
+DESKTOP_DEST := $(HOME)/.config/autostart/zac-watch-linux.desktop
 LINUX_PATH ?= $(HOME)/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 .PHONY: bump-version watcher watcher-install watcher-uninstall watcher-status watcher-clean \
-	watcher-linux-install watcher-linux-uninstall watcher-linux-status
+	watcher-linux-install watcher-linux-uninstall watcher-linux-status \
+	watcher-linux-autostart-install watcher-linux-autostart-uninstall
 
 watcher:
 	cd $(WATCHER_DIR) && swift build -c release
@@ -75,6 +78,26 @@ watcher-linux-uninstall:
 
 watcher-linux-status:
 	systemctl --user status $(WATCHER_LINUX_UNIT) --no-pager | head -20
+
+# For a session that is NOT integrated with systemd --user (NX/NoMachine, xrdp,
+# VNC): `systemctl --user is-active graphical-session.target` says inactive, and
+# the session has its own D-Bus socket in /tmp. The session launches this entry,
+# so the watcher inherits the right bus every time, with nothing to import.
+watcher-linux-autostart-install:
+	@[ "$$(uname -s)" = Linux ] || { echo "watcher-linux-autostart-install: Linux only"; exit 1; }
+	install -d $(PREFIX)/bin $(HOME)/.config/autostart
+	install -m 755 $(WATCHER_LINUX_BIN) $(PREFIX)/bin/zac-watch-linux
+	sed -e 's|@WATCHER_BIN@|$(PREFIX)/bin/zac-watch-linux|g' \
+	    -e 's|@DISPATCH_BIN@|$(DISPATCH_BIN)|g' \
+	    -e 's|@IO_CMD@|$(IO_CMD)|g' \
+	    -e 's|@PATH@|$(LINUX_PATH)|g' \
+	    $(WATCHER_LINUX_DESKTOP_IN) > $(DESKTOP_DEST)
+	@printf 'installed %s\nIt starts at your next login. To start it now:\n  env ZAC_DISPATCH=%s ZAC_IO_CMD=%s %s &\n' \
+		"$(DESKTOP_DEST)" "$(DISPATCH_BIN)" "$(IO_CMD)" "$(PREFIX)/bin/zac-watch-linux"
+	@printf 'If the systemd unit is also installed, remove it: make watcher-linux-uninstall\n'
+
+watcher-linux-autostart-uninstall:
+	rm -f $(DESKTOP_DEST) $(PREFIX)/bin/zac-watch-linux
 
 bump-version:
 ifndef VERSION

@@ -36,12 +36,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     reason; dying instead would eat the unit's start limit during a slow login.
   - Verified on Ubuntu with GNOME: one dispatch per toggle, both backends
     agreeing on the value.
+  - Startup warns when the desktop session is on a different D-Bus than the
+    watcher, because that combination reads the value correctly and then never
+    fires: dconf reads its database file directly and needs no bus, while
+    notifications only arrive over the bus. The usual cause is an NX/NoMachine,
+    xrdp or VNC session, which runs its own D-Bus daemon.
+  - `ZAC_WATCH_VERBOSE=1` logs every line the monitor prints, which is what
+    tells "no signal arrives" apart from "the signal is ignored".
   - When its monitor dies (bus or portal restarted) it exits non-zero and lets
     systemd restart it; `StartLimitBurst=5` per minute stops a broken setup from
     spinning. A failed dispatch is retried once, as on macOS.
   - **Requires GNOME 42+ (Ubuntu 22.04+, Fedora 36+) or a desktop whose
     `xdg-desktop-portal` implements `org.freedesktop.appearance`** (KDE Plasma
     5.24+). Older desktops have no preference to watch and are not supported.
+- An **XDG autostart entry** (`watchers/linux/autostart/`,
+  `make watcher-linux-autostart-install`) as an alternative to the systemd unit,
+  for a session that is not integrated with `systemd --user` — where
+  `systemctl --user is-active graphical-session.target` says `inactive`. There the
+  unit would never start at login, and a unit that is started talks to the wrong
+  bus; the session launches the autostart entry itself, so it inherits that
+  session's bus and `DISPLAY` by construction, per session. The README says which
+  launcher to pick and how to tell.
 - `make watcher-linux-install`, `make watcher-linux-status`,
   `make watcher-linux-uninstall`, and `bin/make-watcher-linux`, which packages
   the script, the unit template and the README as `zac-watch-linux-<tag>.zip`.

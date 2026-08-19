@@ -83,6 +83,45 @@ function _resolve_dispatch() {
 Set ZAC_DISPATCH to the absolute path of zsh-appearance-control/bin/appearance-dispatch." 2
 }
 
+# --- session sanity ----------------------------------------------------------
+
+function _warn_if_foreign_bus() {
+  # Reading a setting and being TOLD it changed are different things: dconf reads
+  # its database file directly and needs no bus at all, while notifications only
+  # arrive over the session D-Bus. A watcher connected to the wrong bus therefore
+  # reports the right value at startup and then never fires again — silently.
+  #
+  # That is the normal state of an NX/NoMachine, xrdp or VNC session: it runs its
+  # own D-Bus daemon (socket in /tmp), while `systemd --user` keeps using
+  # /run/user/$UID/bus. Say so, instead of leaving someone to discover it.
+  [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]] || return 0
+  (( $+commands[pgrep] )) || return 0
+
+  local pid line desktop_bus=''
+  for pid in ${(f)"$(command pgrep -u $UID -x 'gnome-shell|plasmashell|xfce4-session|cinnamon' 2>/dev/null)"}; do
+    [[ -r /proc/$pid/environ ]] || continue
+    for line in ${(f)"$(command tr '\0' '\n' < /proc/$pid/environ 2>/dev/null)"}; do
+      [[ $line == DBUS_SESSION_BUS_ADDRESS=* ]] || continue
+      desktop_bus=${line#DBUS_SESSION_BUS_ADDRESS=}
+      break
+    done
+    [[ -n $desktop_bus ]] && break
+  done
+
+  [[ -n $desktop_bus ]] || return 0
+  [[ $desktop_bus == $DBUS_SESSION_BUS_ADDRESS ]] && return 0
+
+  _err "WARNING: the desktop session is on a different D-Bus.
+  ours:    $DBUS_SESSION_BUS_ADDRESS
+  desktop: $desktop_bus
+The current value can still be read, but change notifications will never arrive,
+so the appearance will look correct at startup and then never update. This is the
+usual state of an NX, xrdp or VNC session. See 'When a change is not noticed' in
+the watcher README: either autostart the watcher from the session itself, or run
+  systemctl --user import-environment DBUS_SESSION_BUS_ADDRESS DISPLAY XAUTHORITY
+after every login."
+}
+
 # --- backends ----------------------------------------------------------------
 #
 # Each backend is a pair: a MONITOR command that prints one line per change and
@@ -290,7 +329,10 @@ TRAPINT()  { exit 0 }
 TRAPHUP()  { exit 0 }
 TRAPEXIT() { [[ -n ${MONITOR_PID:-} ]] && command kill $MONITOR_PID 2>/dev/null; return 0 }
 
+_warn_if_foreign_bus
+
 _log "watching (backend: $BACKEND, dispatcher: $DISPATCH)"
+(( VERBOSE )) && _log "bus: ${DBUS_SESSION_BUS_ADDRESS:-<unset>}"
 
 # Sync at start: the service starts with the session, and the appearance may
 # have changed while it was not running.
