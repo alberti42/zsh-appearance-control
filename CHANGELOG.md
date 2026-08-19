@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`make watcher-install` now installs the watcher for the machine it runs on.**
+  It was the macOS target, so running it on Linux failed with a Swift error, and
+  the reader had to know which of three targets applied. On Linux it also picks
+  the launcher: the systemd unit when the session is integrated with
+  `systemd --user`, the XDG autostart entry when it is not — the same test the
+  README describes. Override with `LINUX_LAUNCHER=systemd|autostart`.
+  `watcher-uninstall` and `watcher-status` dispatch the same way, and an
+  unsupported OS gets one clear sentence instead of a compiler error.
+- The macOS targets are now named for their OS: `watcher-macos`,
+  `watcher-macos-install`, `watcher-macos-uninstall`, `watcher-macos-status`,
+  `watcher-macos-clean`. The Linux targets keep their names, and gained
+  `watcher-linux-autostart-status`.
+
 ## [2.2.1] - 2026-08-19
 
 ### Changed

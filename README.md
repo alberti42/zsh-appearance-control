@@ -378,7 +378,8 @@ make watcher-install \
   IO_CMD=$HOME/path/to/your/io-script          # optional
 ```
 
-That builds the binary into `~/.local/bin`, writes
+`make watcher-install` installs the watcher for the machine it runs on — the same
+command on macOS and Linux. On macOS it builds the binary into `~/.local/bin`, writes
 `~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist`, and loads it
 in the `gui/` domain. The agent then runs
 `appearance-dispatch dispatch <0|1>` on every change, with `ZAC_IO_CMD`, `PATH`
@@ -408,9 +409,13 @@ graphical session, because both backends need the session D-Bus.
 
 ```zsh
 cd /path/to/zsh-appearance-control
-make watcher-linux-install \
+make watcher-install \
   IO_CMD=$HOME/path/to/your/io-script          # optional
 ```
+
+On Linux that also chooses the launcher for you: the systemd unit when your
+session is integrated with `systemd --user`, the XDG autostart entry when it is
+not (NX, xrdp, VNC). Force one with `LINUX_LAUNCHER=systemd|autostart`.
 
 That installs `~/.local/bin/zac-watch-linux` and
 `~/.config/systemd/user/zac-watch-linux.service`, then enables and starts it.

@@ -1,3 +1,40 @@
+# --- one command per task, whatever the OS ---------------------------------
+#
+# `make watcher-install` installs the watcher that fits this machine. The
+# per-OS targets below still exist for when you want to be explicit, or to
+# install for the other launcher.
+#
+# On Linux there are two launchers, and the choice is not cosmetic: a session
+# integrated with `systemd --user` gets the unit, a session that is not (NX,
+# xrdp, VNC) gets the XDG autostart entry, because there the unit would never
+# start at login and would talk to the wrong D-Bus. That is the same test the
+# README describes, so make it rather than ask the reader to make it.
+# Override with LINUX_LAUNCHER=systemd|autostart.
+
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+  WATCHER_OS := macos
+else ifeq ($(UNAME_S),Linux)
+  WATCHER_OS := linux
+  LINUX_LAUNCHER ?= $(shell systemctl --user is-active graphical-session.target 2>/dev/null | grep -qx active && echo systemd || echo autostart)
+  ifeq ($(LINUX_LAUNCHER),autostart)
+    LINUX_SUFFIX := autostart-
+  else
+    LINUX_SUFFIX :=
+  endif
+else
+  WATCHER_OS := unsupported
+endif
+
+watcher-install watcher-uninstall watcher-status: watcher-%: watcher-$(WATCHER_OS)-$(LINUX_SUFFIX)%
+	@:
+
+ifeq ($(WATCHER_OS),unsupported)
+watcher-%:
+	@echo "no watcher for $(UNAME_S); this project ships one for macOS and one for Linux"; exit 1
+endif
+
 # --- macOS appearance watcher (watchers/macos) ---
 
 WATCHER_DIR    := watchers/macos
@@ -31,14 +68,16 @@ WATCHER_LINUX_DESKTOP_IN := $(WATCHER_LINUX_DIR)/autostart/zac-watch-linux.deskt
 DESKTOP_DEST := $(HOME)/.config/autostart/zac-watch-linux.desktop
 LINUX_PATH ?= $(HOME)/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
-.PHONY: bump-version watcher watcher-install watcher-uninstall watcher-status watcher-clean \
+.PHONY: bump-version \
+	watcher-install watcher-uninstall watcher-status \
+	watcher-macos watcher-macos-install watcher-macos-uninstall watcher-macos-status watcher-macos-clean \
 	watcher-linux-install watcher-linux-uninstall watcher-linux-status \
-	watcher-linux-autostart-install watcher-linux-autostart-uninstall
+	watcher-linux-autostart-install watcher-linux-autostart-uninstall watcher-linux-autostart-status
 
-watcher:
+watcher-macos:
 	cd $(WATCHER_DIR) && swift build -c release
 
-watcher-install: watcher
+watcher-macos-install: watcher-macos
 	install -d $(PREFIX)/bin $(LOG_DIR)
 	install -m 755 $(WATCHER_BIN) $(PREFIX)/bin/zac-watch-macos
 	sed -e 's|@WATCHER_BIN@|$(PREFIX)/bin/zac-watch-macos|g' \
@@ -53,14 +92,14 @@ watcher-install: watcher
 	launchctl bootstrap gui/$$(id -u) $(PLIST_DEST)
 	@printf 'installed %s\nlog: %s/zac-watch-macos.log\n' "$(PLIST_DEST)" "$(LOG_DIR)"
 
-watcher-uninstall:
+watcher-macos-uninstall:
 	-launchctl bootout gui/$$(id -u)/$(WATCHER_LABEL) 2>/dev/null
 	rm -f $(PLIST_DEST) $(PREFIX)/bin/zac-watch-macos
 
-watcher-status:
+watcher-macos-status:
 	launchctl print gui/$$(id -u)/$(WATCHER_LABEL) | head -20
 
-watcher-clean:
+watcher-macos-clean:
 	rm -rf $(WATCHER_DIR)/.build
 
 watcher-linux-install:
@@ -106,6 +145,11 @@ watcher-linux-autostart-install:
 
 watcher-linux-autostart-uninstall:
 	rm -f $(DESKTOP_DEST) $(PREFIX)/bin/zac-watch-linux
+
+# There is no supervisor to ask, so report what exists and what runs.
+watcher-linux-autostart-status:
+	@test -f $(DESKTOP_DEST) && echo "entry:   $(DESKTOP_DEST)" || echo "entry:   not installed"
+	@pgrep -a -u $$(id -u) -f 'zac-watch-linux' || echo "process: not running"
 
 bump-version:
 ifndef VERSION

@@ -41,13 +41,17 @@ swift build -c release
 From the repository root you can also use the Makefile:
 
 ```zsh
-make watcher                # build
 make watcher-install        # build, install binary + agent, load it
 make watcher-status         # launchctl print
 make watcher-uninstall      # unload and remove
 ```
 
-`watcher-install` accepts overrides:
+`make watcher-install` picks the watcher for the machine it runs on, so the same
+command works on macOS and on Linux. To be explicit, or to build without
+installing, use the per-OS names: `watcher-macos`, `watcher-macos-install`,
+`watcher-macos-status`, `watcher-macos-uninstall`, `watcher-macos-clean`.
+
+The install target accepts overrides:
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -123,7 +127,7 @@ disk images, code-signed bundles and installer packages, and a bare Mach-O
 executable is none of them. The ticket is registered against the binary's
 cdhash instead, so a quarantined copy is checked online the first time it runs.
 
-A binary you build yourself (`make watcher`) carries only the ad-hoc signature
+A binary you build yourself (`make watcher-macos`) carries only the ad-hoc signature
 the linker gives it. That is fine: a locally built file is never quarantined.
 If you ever end up with a quarantined unsigned copy — for example one built on
 another machine and moved over — clear the flag:

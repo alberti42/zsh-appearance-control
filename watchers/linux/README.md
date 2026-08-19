@@ -55,11 +55,16 @@ colour changes touch neighbouring keys. Triggers are coalesced
 
 ## Which launcher: systemd or XDG autostart?
 
-Ask your session:
+`make watcher-install` asks your session this question and installs the matching
+launcher, so you do not have to choose:
 
 ```zsh
 systemctl --user is-active graphical-session.target
 ```
+
+Override the choice with `LINUX_LAUNCHER=systemd` or `LINUX_LAUNCHER=autostart`,
+or call the explicit targets (`watcher-linux-install`,
+`watcher-linux-autostart-install`).
 
 | Answer | Use | Why |
 |---|---|---|
