@@ -80,6 +80,9 @@ The autostart entry avoids both: the session launches it, so it inherits that
 session's bus and `DISPLAY` by construction, and it is re-launched per session —
 which matters because the `/tmp` socket path changes with every login.
 
+Verified on Ubuntu GNOME reached over NoMachine: after a reboot and a fresh
+login, the watcher runs and follows the theme with no manual step.
+
 If you would rather keep systemd on such a session, you must hand it the address
 after every login:
 
