@@ -162,3 +162,42 @@ Common outcomes:
 The `custom` backend is also the test harness: point it at a script that prints
 a line per change and another that prints the state, and the whole loop can be
 exercised without a desktop.
+
+## When a change is not noticed
+
+The startup dispatch works but toggling the theme does nothing? Those are two
+different code paths: reading the value goes through dconf, which reads its
+database file directly and needs no bus, while *notifications* only arrive over
+the session D-Bus. A watcher can therefore read correctly and still never be
+told about a change.
+
+Run it in the foreground with the same backend the service chose, and with the
+raw monitor stream shown:
+
+```zsh
+ZAC_WATCH_BACKEND=gsettings ZAC_WATCH_VERBOSE=1 \
+ZAC_DISPATCH=/path/to/bin/appearance-dispatch ZAC_CACHE_DIR=/tmp/zac-t \
+  ./zac-watch-linux
+```
+
+| What you see when toggling | Meaning |
+|---|---|
+| no `monitor:` line at all | the monitor is not delivering; try `ZAC_WATCH_BACKEND=portal` |
+| `monitor:` lines but no `change:` | the line was not recognised as a trigger (report it) |
+| works here, not as a service | the service inherited a different session bus |
+
+For the last case, compare the two:
+
+```zsh
+tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value zac-watch-linux)/environ \
+  | grep -E 'DBUS|XDG_RUNTIME'
+echo "$DBUS_SESSION_BUS_ADDRESS"
+systemctl --user is-active graphical-session.target
+```
+
+Forcing the portal backend in the unit is the usual answer, because the portal is
+D-Bus activated and reachable as soon as the session is up:
+
+```ini
+Environment=ZAC_WATCH_BACKEND=portal
+```

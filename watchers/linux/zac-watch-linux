@@ -53,6 +53,8 @@ Environment:
   ZAC_WATCH_MONITOR_CMD  custom backend: command that prints one line per
                          appearance change and never exits.
   ZAC_WATCH_READ_CMD     custom backend: command that prints 1 (dark) or 0.
+  ZAC_WATCH_VERBOSE      1 logs every line the monitor prints, which is how you
+                         tell "no signal arrives" from "the signal is ignored".
 
 Everything else in the environment (ZAC_IO_CMD, ZAC_CACHE_DIR, PATH, …) is
 passed through to the dispatcher unchanged."
@@ -191,13 +193,17 @@ with org.gnome.desktop.interface color-scheme. Is DBUS_SESSION_BUS_ADDRESS set?"
 }
 
 function _is_trigger() {
-  # True when a monitor line concerns the colour scheme. Everything else on the
-  # bus (accent colour, portal chatter, other gsettings keys) is ignored.
+  # True when a monitor line concerns the colour scheme.
+  #
+  # The portal monitor sees every signal on the portal object, so that one needs
+  # a filter. `gsettings monitor <schema> <key>` watches a single key, so every
+  # line it prints is that key by definition — do not filter on the line format
+  # there, which differs between glib versions and is one more thing to get
+  # wrong on a machine you cannot test on.
   local line=$1
   case $BACKEND in
-    portal)    [[ $line == *SettingChanged*color-scheme* ]] ;;
-    gsettings) [[ $line == color-scheme:* ]] ;;
-    *)         [[ -n $line ]] ;;
+    portal) [[ $line == *SettingChanged*color-scheme* ]] ;;
+    *)      [[ -n $line ]] ;;
   esac
 }
 
@@ -259,6 +265,9 @@ _int_env ZAC_WATCH_PORTAL_TIMEOUT_MS 3000; PORTAL_TIMEOUT_S=$(( REPLY / 1000.0 )
 _int_env ZAC_WATCH_DETECT_TRIES  5; DETECT_TRIES=$REPLY
 _int_env ZAC_WATCH_DETECT_WAIT_S 3; DETECT_WAIT_S=$REPLY
 
+typeset -gi VERBOSE
+_int_env ZAC_WATCH_VERBOSE 0; VERBOSE=$REPLY
+
 case ${1:-} in
   --help|-h) _usage; exit 0 ;;
   --version) builtin print -r -- "$PROGNAME $VERSION"; exit 0 ;;
@@ -294,6 +303,7 @@ typeset -g MONITOR_PID=$!
 
 typeset -g line
 while read -r -p line; do
+  (( VERBOSE )) && _log "monitor: $line"
   _is_trigger "$line" || continue
   # Drain the burst: every further line inside the window is the same change.
   # `-t` takes its argument in the same word.
