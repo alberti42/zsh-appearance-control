@@ -17,6 +17,7 @@
 #   @DISPATCH_BIN@  absolute path to zsh-appearance-control/bin/appearance-dispatch
 #   @IO_CMD@        absolute path to your ZAC_IO_CMD script, or empty for none
 #   @PATH@          PATH for the watcher and every process it spawns
+#   @CACHE_DIR@     ZAC_CACHE_DIR, or empty for the default
 #
 # No shell and no redirection here on purpose: Desktop Entry quoting rules are
 # their own dialect, and a mis-quoted Exec fails silently. Output therefore goes
@@ -26,7 +27,7 @@ Type=Application
 Version=1.0
 Name=zsh-appearance-control watcher
 Comment=Dispatch light/dark changes to zsh shells
-Exec=env ZAC_DISPATCH=@DISPATCH_BIN@ ZAC_IO_CMD=@IO_CMD@ PATH=@PATH@ @WATCHER_BIN@
+Exec=env ZAC_DISPATCH=@DISPATCH_BIN@ ZAC_IO_CMD=@IO_CMD@ ZAC_CACHE_DIR=@CACHE_DIR@ PATH=@PATH@ @WATCHER_BIN@
 Terminal=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true

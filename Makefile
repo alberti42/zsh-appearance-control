@@ -11,6 +11,11 @@ PREFIX      ?= $(HOME)/.local
 DISPATCH_BIN ?= $(CURDIR)/bin/appearance-dispatch
 IO_CMD      ?=
 AGENT_PATH   ?= /opt/homebrew/bin:/usr/local/bin:$(HOME)/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+# The cache directory is a plugin setting, so do not invent a second place to
+# configure it: make inherits the environment, so an exported ZAC_CACHE_DIR from
+# your shell config lands in the launcher automatically. Empty means "use the
+# default", which every consumer resolves the same way (${ZAC_CACHE_DIR:-…}).
+CACHE_DIR   ?= $(ZAC_CACHE_DIR)
 LOG_DIR     ?= $(HOME)/Library/Logs
 PLIST_DEST   := $(HOME)/Library/LaunchAgents/$(WATCHER_LABEL).plist
 
@@ -40,6 +45,7 @@ watcher-install: watcher
 	    -e 's|@DISPATCH_BIN@|$(DISPATCH_BIN)|g' \
 	    -e 's|@IO_CMD@|$(IO_CMD)|g' \
 	    -e 's|@PATH@|$(AGENT_PATH)|g' \
+	    -e 's|@CACHE_DIR@|$(CACHE_DIR)|g' \
 	    -e 's|@LOG_DIR@|$(LOG_DIR)|g' \
 	    $(WATCHER_PLIST_IN) > $(PLIST_DEST)
 	@# Reload: bootout first so an updated plist is picked up.
@@ -65,6 +71,7 @@ watcher-linux-install:
 	    -e 's|@DISPATCH_BIN@|$(DISPATCH_BIN)|g' \
 	    -e 's|@IO_CMD@|$(IO_CMD)|g' \
 	    -e 's|@PATH@|$(LINUX_PATH)|g' \
+	    -e 's|@CACHE_DIR@|$(CACHE_DIR)|g' \
 	    $(WATCHER_LINUX_UNIT_IN) > $(UNIT_DEST)
 	systemctl --user daemon-reload
 	systemctl --user reenable $(WATCHER_LINUX_UNIT)
@@ -91,6 +98,7 @@ watcher-linux-autostart-install:
 	    -e 's|@DISPATCH_BIN@|$(DISPATCH_BIN)|g' \
 	    -e 's|@IO_CMD@|$(IO_CMD)|g' \
 	    -e 's|@PATH@|$(LINUX_PATH)|g' \
+	    -e 's|@CACHE_DIR@|$(CACHE_DIR)|g' \
 	    $(WATCHER_LINUX_DESKTOP_IN) > $(DESKTOP_DEST)
 	@printf 'installed %s\nIt starts at your next login. To start it now:\n  env ZAC_DISPATCH=%s ZAC_IO_CMD=%s %s &\n' \
 		"$(DESKTOP_DEST)" "$(DISPATCH_BIN)" "$(IO_CMD)" "$(PREFIX)/bin/zac-watch-linux"

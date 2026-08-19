@@ -8,6 +8,7 @@
     @DISPATCH_BIN@  absolute path to zsh-appearance-control/bin/appearance-dispatch
     @IO_CMD@        absolute path to your ZAC_IO_CMD script, or empty for none
     @PATH@          PATH for the agent and every process it spawns
+    @CACHE_DIR@     ZAC_CACHE_DIR, or empty for the default
     @LOG_DIR@       directory for the agent's stdout/stderr log
 
   Install by hand instead:
@@ -71,10 +72,15 @@
     <key>PATH</key>
     <string>@PATH@</string>
 
-    <!-- Optional: uncomment to override the cache directory.
-    <key>ZAC_CACHE_DIR</key>
-    <string>/Users/you/.cache/zac</string>
+    <!--
+      The cache directory. Empty means the default ($XDG_CACHE_HOME/zac, else
+      ~/.cache/zac), which every consumer resolves the same way — so an empty
+      value here is correct, not a missing setting. `make watcher-install` fills
+      it in from ZAC_CACHE_DIR in the environment it is run from, so a value
+      exported by your shell config is picked up without setting it twice.
     -->
+    <key>ZAC_CACHE_DIR</key>
+    <string>@CACHE_DIR@</string>
   </dict>
 
   <key>StandardOutPath</key>

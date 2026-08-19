@@ -171,6 +171,21 @@ The watcher reads only these:
 Everything else is inherited by the dispatcher unchanged. Set `ZAC_IO_CMD`,
 `ZAC_CACHE_DIR` and `PATH` in the unit, not on the watcher's command line.
 
+### `ZAC_CACHE_DIR`
+
+The cache directory is a plugin setting, and there is only one place to set it:
+export it where you configure the plugin.
+
+```zsh
+export ZAC_CACHE_DIR=/run/user/$UID/zac
+```
+
+The watcher runs outside your shell, so it cannot see that export — but `make`
+can. The install targets read `ZAC_CACHE_DIR` from the environment they are run
+from and write it into the launcher, so running `make …-install` from a shell
+where the variable is set is enough. Leave it unset and every side falls back to
+the same default (`$XDG_CACHE_HOME/zac`, else `~/.cache/zac`).
+
 ## Restart semantics
 
 `gdbus monitor` and `gsettings monitor` die when the session bus or the portal

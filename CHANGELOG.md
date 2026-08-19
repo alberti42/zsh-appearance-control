@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The launcher templates take `ZAC_CACHE_DIR` from the environment at install
+  time. It is a plugin setting, so it should be configured once where you
+  configure the plugin; the watcher runs outside your shell and cannot see that
+  export, but `make` can, and it writes the value into the plist, the systemd
+  unit or the autostart entry. Empty stays correct: every consumer falls back to
+  the same default.
+
 ### Documentation
 
 - The example `zac.zsh` primes the state at load with `_zac.sync` instead of

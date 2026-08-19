@@ -5,6 +5,7 @@
 #   @DISPATCH_BIN@  absolute path to zsh-appearance-control/bin/appearance-dispatch
 #   @IO_CMD@        absolute path to your ZAC_IO_CMD script, or empty for none
 #   @PATH@          PATH for the service and every process it spawns
+#   @CACHE_DIR@     ZAC_CACHE_DIR, or empty for the default
 #
 # Install by hand instead:
 #   sed -e 's|@WATCHER_BIN@|/path/to/zac-watch-linux|' … template \
@@ -36,8 +37,12 @@ ExecStart=@WATCHER_BIN@
 Environment=ZAC_DISPATCH=@DISPATCH_BIN@
 Environment=ZAC_IO_CMD=@IO_CMD@
 Environment=PATH=@PATH@
-# Optional: uncomment to override the cache directory.
-#Environment=ZAC_CACHE_DIR=%h/.cache/zac
+# The cache directory. Empty means the default ($XDG_CACHE_HOME/zac, else
+# ~/.cache/zac), which every consumer resolves the same way — so an empty value
+# is correct here, not a missing setting. `make watcher-linux-install` fills it in
+# from ZAC_CACHE_DIR in the environment it is run from, so a value exported by
+# your shell config is picked up without configuring it twice.
+Environment=ZAC_CACHE_DIR=@CACHE_DIR@
 
 # The watcher exits non-zero when its monitor dies (session bus restarted, or
 # the portal was restarted), and expects to be restarted.

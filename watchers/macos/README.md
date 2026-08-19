@@ -139,6 +139,21 @@ ZAC_CODESIGN_ID="Developer ID Application: Your Name (TEAMID)" \
   zsh -f bin/make-watcher v9.9.9
 ```
 
+### `ZAC_CACHE_DIR`
+
+The cache directory is a plugin setting, and there is only one place to set it:
+export it where you configure the plugin.
+
+```zsh
+export ZAC_CACHE_DIR=/run/user/$UID/zac
+```
+
+The watcher runs outside your shell, so it cannot see that export — but `make`
+can. The install targets read `ZAC_CACHE_DIR` from the environment they are run
+from and write it into the launcher, so running `make …-install` from a shell
+where the variable is set is enough. Leave it unset and every side falls back to
+the same default (`$XDG_CACHE_HOME/zac`, else `~/.cache/zac`).
+
 ## Retry semantics
 
 A failed dispatch (non-zero `ZAC_IO_CMD`) writes no ground truth and signals no
