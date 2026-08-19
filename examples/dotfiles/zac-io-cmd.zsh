@@ -2,8 +2,14 @@
 
 # EXAMPLE — not a drop-in.
 #
-# Snapshot of the author's private dotfiles (zinit/src/zac/zac-io-cmd.zsh), taken 2026-08-19, used as
-# ZAC_IO_CMD. Not refreshed automatically.
+# Source:      zinit/src/zac/zac-io-cmd.zsh  (a private dotfiles repo)
+# Snapshot:    2026-08-19
+# Tested with: zsh-appearance-control v2.2.0
+#
+# Snapshots are allowed to diverge from their originals — the private copy
+# keeps evolving. What must not go stale is the 'Tested with' line: it is a
+# claim that this file was actually run against that release of the plugin,
+# so it is bumped by hand after re-testing, never automatically.
 #
 # What it demonstrates
 #   - the ZAC_IO_CMD contract: one executable, called as `<script> <0|1>`, run

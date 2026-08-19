@@ -73,11 +73,27 @@ plugin:
 | `patina`, `vivid`, `yazi`, `btop`, `opencode`, `gemini`, `claude` | the tools being themed |
 | `_zsh_opencode_tab`, `+zi-log` | other plugins |
 
+## The two dates in each header
+
+```
+# Snapshot:    2026-08-19
+# Tested with: zsh-appearance-control v2.2.0
+```
+
+`Snapshot` says when the file was copied out of the private repository. Divergence
+from the original after that is expected and harmless — that copy keeps evolving,
+and this one is a teaching artefact.
+
+`Tested with` is the load-bearing one: it claims the file was actually run against
+that release of the plugin. It is therefore **never bumped automatically**; a `sed`
+rule in `make bump-version` would turn a claim of testing into a lie. Instead the
+release target prints a note when an example still names an older version, and
+whoever cuts the release decides whether to re-test and bump, or to leave the
+older number standing as the honest answer.
+
 ## Caveats
 
-- Not refreshed automatically. `make bump-version` does not touch these files,
-  and they will drift from their originals; the date in each header says when the
-  snapshot was taken.
+- Not refreshed automatically. `make bump-version` does not rewrite these files.
 - Not part of the release artifacts. `examples/` is excluded from the plugin zip
   on purpose — these are reading material, not something to install.
 - The `sed` rewrites assume the exact shape of each config file. They are the

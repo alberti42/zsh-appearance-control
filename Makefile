@@ -128,6 +128,16 @@ endif
 		$(WATCHER_LINUX_BIN) > $(WATCHER_LINUX_BIN).tmp
 	mv $(WATCHER_LINUX_BIN).tmp $(WATCHER_LINUX_BIN)
 	chmod 755 $(WATCHER_LINUX_BIN)
+	@# The examples in examples/dotfiles are snapshots and are deliberately NOT
+	@# bumped here: their "Tested with" line claims someone ran them against that
+	@# release, and a sed rule would turn that claim into a lie. Warn instead.
+	@for f in examples/dotfiles/*.zsh; do \
+		v=$$(sed -n 's/^# Tested with: zsh-appearance-control v\(.*\)$$/\1/p' $$f | head -1); \
+		if [ "$$v" != "$(VERSION)" ]; then \
+			echo "NOTE: $$f was tested with v$$v, releasing v$(VERSION)"; \
+			echo "      re-test it and update the 'Tested with' header, or leave it as the honest answer"; \
+		fi; \
+	done
 	@# Promote the [Unreleased] section of CHANGELOG.md to this version.
 	@# Fails when [Unreleased] is empty, so a release always has notes.
 	zsh -f bin/changelog release $(VERSION)

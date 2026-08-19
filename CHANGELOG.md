@@ -69,8 +69,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tools, treating "not installed here" as a skip rather than an abort) and
   `zac-tmux-cmd.zsh` (the tmux options that live in the server, shared by the io
   script and `tmux.conf`). Snapshots with a header saying what each demonstrates,
-  what to replace, and when it was taken; not refreshed automatically and not
-  part of any release artifact. Linked from the README as *Goodies*.
+  what to replace, and two dated fields: `Snapshot` (when it was copied) and
+  `Tested with` (the plugin release it was actually run against). The latter is
+  never bumped automatically — that would turn a claim of testing into a lie — so
+  `make bump-version` prints a note when an example still names an older release.
+  Not part of any release artifact. Linked from the README as *Goodies*.
 
 ### Deprecated
 

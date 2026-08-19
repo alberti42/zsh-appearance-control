@@ -2,11 +2,14 @@
 
 # EXAMPLE — not a drop-in.
 #
-# Snapshot of the author's private dotfiles (zinit/src/zac/zac.zsh), taken
-# 2026-08-19. It is kept
-# here because a real configuration is more instructive than a synthetic one, and
-# it is NOT refreshed automatically: treat it as a worked example, not as the
-# current state of anyone's setup.
+# Source:      zinit/src/zac/zac.zsh  (a private dotfiles repo)
+# Snapshot:    2026-08-19
+# Tested with: zsh-appearance-control v2.2.0
+#
+# Snapshots are allowed to diverge from their originals — the private copy
+# keeps evolving. What must not go stale is the 'Tested with' line: it is a
+# claim that this file was actually run against that release of the plugin,
+# so it is bumped by hand after re-testing, never automatically.
 #
 # What it demonstrates
 #   - loading the plugin with zinit, turbo mode, and priming the state at load
