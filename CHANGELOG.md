@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-08-19
+
 ### Changed
 
 - The launcher templates take `ZAC_CACHE_DIR` from the environment at install
@@ -264,7 +266,8 @@ No release notes were provided for this version.
 
 First release.
 
-[Unreleased]: https://github.com/alberti42/zsh-appearance-control/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/alberti42/zsh-appearance-control/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/alberti42/zsh-appearance-control/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/alberti42/zsh-appearance-control/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/alberti42/zsh-appearance-control/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/alberti42/zsh-appearance-control/compare/v1.1.0...v2.0.0

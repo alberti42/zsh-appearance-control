@@ -5,7 +5,7 @@ setopt extended_glob
 
 # zac-watch-linux — Linux appearance watcher for zsh-appearance-control.
 #
-# Version: 2.2.0
+# Version: 2.2.1
 #
 # A tiny systemd user service. It waits for the desktop to report a
 # light/dark change and calls `appearance-dispatch dispatch <0|1>`. It knows
@@ -29,7 +29,7 @@ setopt extended_glob
 # journald timestamps every line, so nothing is printed with a timestamp here.
 
 typeset -g PROGNAME=${0:t}
-typeset -g VERSION=2.2.0
+typeset -g VERSION=2.2.1
 
 function _log()  { builtin print -r -- "$PROGNAME: $*" }
 function _err()  { builtin print -r -- "$PROGNAME: $*" >&2 }
