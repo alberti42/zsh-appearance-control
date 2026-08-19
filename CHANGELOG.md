@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   README describes. Override with `LINUX_LAUNCHER=systemd|autostart`.
   `watcher-uninstall` and `watcher-status` dispatch the same way, and an
   unsupported OS gets one clear sentence instead of a compiler error.
+- The install targets print a note when no `IO_CMD` is given. Without it the
+  appearance file and the shells still follow the theme, but nothing that writes
+  config files does (tmux, btop, editors), which is easy to miss on a reinstall.
 - The macOS targets are now named for their OS: `watcher-macos`,
   `watcher-macos-install`, `watcher-macos-uninstall`, `watcher-macos-status`,
   `watcher-macos-clean`. The Linux targets keep their names, and gained

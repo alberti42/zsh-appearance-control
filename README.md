@@ -375,8 +375,12 @@ appearance automatically at sunset.
 ```zsh
 cd /path/to/zsh-appearance-control
 make watcher-install \
-  IO_CMD=$HOME/path/to/your/io-script          # optional
+  IO_CMD=$HOME/path/to/your/io-script          # your heavy-I/O script, if you have one
 ```
+
+`IO_CMD` is optional, but without it the watcher updates the appearance file and
+signals your shells and nothing else: config files (tmux, btop, editors) stop
+following the theme. The install prints a note when it is missing.
 
 `make watcher-install` installs the watcher for the machine it runs on — the same
 command on macOS and Linux. On macOS it builds the binary into `~/.local/bin`, writes
@@ -410,7 +414,7 @@ graphical session, because both backends need the session D-Bus.
 ```zsh
 cd /path/to/zsh-appearance-control
 make watcher-install \
-  IO_CMD=$HOME/path/to/your/io-script          # optional
+  IO_CMD=$HOME/path/to/your/io-script          # your heavy-I/O script, if you have one
 ```
 
 On Linux that also chooses the launcher for you: the systemd unit when your

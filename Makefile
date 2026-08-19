@@ -91,6 +91,7 @@ watcher-macos-install: watcher-macos
 	-launchctl bootout gui/$$(id -u)/$(WATCHER_LABEL) 2>/dev/null
 	launchctl bootstrap gui/$$(id -u) $(PLIST_DEST)
 	@printf 'installed %s\nlog: %s/zac-watch-macos.log\n' "$(PLIST_DEST)" "$(LOG_DIR)"
+	$(if $(IO_CMD),,@echo "note: installed without IO_CMD. The appearance file and your shells will follow the theme, but config files (tmux, btop, editors, ...) will not. Re-run with IO_CMD=/path/to/your/io-script if you have one.")
 
 watcher-macos-uninstall:
 	-launchctl bootout gui/$$(id -u)/$(WATCHER_LABEL) 2>/dev/null
@@ -116,6 +117,7 @@ watcher-linux-install:
 	systemctl --user reenable $(WATCHER_LINUX_UNIT)
 	systemctl --user restart $(WATCHER_LINUX_UNIT)
 	@printf 'installed %s\nlog: journalctl --user -u %s -f\n' "$(UNIT_DEST)" "$(WATCHER_LINUX_UNIT)"
+	$(if $(IO_CMD),,@echo "note: installed without IO_CMD. The appearance file and your shells will follow the theme, but config files (tmux, btop, editors, ...) will not. Re-run with IO_CMD=/path/to/your/io-script if you have one.")
 
 watcher-linux-uninstall:
 	-systemctl --user disable --now $(WATCHER_LINUX_UNIT)
@@ -142,6 +144,7 @@ watcher-linux-autostart-install:
 	@printf 'installed %s\nIt starts at your next login. To start it now:\n  env ZAC_DISPATCH=%s ZAC_IO_CMD=%s %s &\n' \
 		"$(DESKTOP_DEST)" "$(DISPATCH_BIN)" "$(IO_CMD)" "$(PREFIX)/bin/zac-watch-linux"
 	@printf 'If the systemd unit is also installed, remove it: make watcher-linux-uninstall\n'
+	$(if $(IO_CMD),,@echo "note: installed without IO_CMD. The appearance file and your shells will follow the theme, but config files (tmux, btop, editors, ...) will not. Re-run with IO_CMD=/path/to/your/io-script if you have one.")
 
 watcher-linux-autostart-uninstall:
 	rm -f $(DESKTOP_DEST) $(PREFIX)/bin/zac-watch-linux
