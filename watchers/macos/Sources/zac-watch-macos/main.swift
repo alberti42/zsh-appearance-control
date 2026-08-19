@@ -1,6 +1,6 @@
 // zac-watch-macos — macOS appearance watcher for zsh-appearance-control.
 //
-// Version: 2.1.0
+// Version: 2.2.0
 //
 // A tiny launchd agent. It listens for the system dark/light change and calls
 // `appearance-dispatch dispatch <0|1>`. It knows nothing about the plugin, the
@@ -20,7 +20,7 @@
 
 import Foundation
 
-let zacWatchVersion = "2.1.0"
+let zacWatchVersion = "2.2.0"
 
 let programName = "zac-watch-macos"
 
