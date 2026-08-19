@@ -13,8 +13,10 @@
 #
 # What it demonstrates
 #   - loading the plugin with zinit, turbo mode, and priming the state at load
-#     time (`zac sync && __my_appearance_immediate "$REPLY"`), so the very first
-#     prompt is already themed;
+#     time, so the very first prompt is already themed. The prime calls
+#     `_zac.sync` (in core.zsh, already loaded) rather than `zac sync`: the `zac`
+#     command is a lazy stub, so calling it at startup sources the CLI module and
+#     undoes the laziness for no gain;
 #   - a ZAC_IMMEDIATE_CALLBACK_FNC that obeys the contract: variable assignments
 #     and zstyle only — no subshells, no external commands, no output. It runs
 #     inside TRAPUSR1, where anything heavier can wedge the shell.
@@ -94,6 +96,6 @@ function __my_appearance_immediate() {
   zinit lucid wait light-mode for \
       wait'0' \
       atinit"export ZAC_IMMEDIATE_CALLBACK_FNC=__my_appearance_immediate" \
-      atload'zac sync && __my_appearance_immediate "$REPLY"' \
+      atload'_zac.sync; __my_appearance_immediate "${_zac[state.is_dark]}"' \
       $__local_plugin_path/zsh-appearance-control
 }

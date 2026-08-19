@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- The example `zac.zsh` primes the state at load with `_zac.sync` instead of
+  `zac sync`. `zac` is a lazy stub, so calling it at startup sources the CLI
+  module and defeats the laziness; `_zac.sync` is in `core.zsh` and already
+  loaded. Worth about 3 ms per shell.
+
 ## [2.2.0] - 2026-08-19
 
 ### Added

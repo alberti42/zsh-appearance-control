@@ -633,7 +633,7 @@ warts included:
 
 | File | Role |
 |---|---|
-| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load with turbo mode, state primed at load time, and a `ZAC_IMMEDIATE_CALLBACK_FNC` that stays inside the "assignments only" rule (`LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight`, completion colours) |
+| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load with turbo mode, state primed at load time with `_zac.sync` (not `zac sync`, which would source the lazy CLI module at every startup), and a `ZAC_IMMEDIATE_CALLBACK_FNC` that stays inside the "assignments only" rule (`LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight`, completion colours) |
 | [`zac-io-cmd.zsh`](examples/dotfiles/zac-io-cmd.zsh) | a `ZAC_IO_CMD` that rewrites configs for yazi, btop, patina, claude, opencode and IPython, flips the vivid `LS_COLORS` and git-theme symlinks, and — the part worth copying — treats "this tool is not installed here" as a skip rather than a failure, because a non-zero exit aborts the whole dispatch |
 | [`zac-tmux-cmd.zsh`](examples/dotfiles/zac-tmux-cmd.zsh) | the tmux options that live in the server's memory, in one helper shared by the io script and by `tmux.conf` at server start |
 
