@@ -40,7 +40,7 @@ jobs:
       CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Only when the certificate is available: see the note above.
       - name: Import the signing certificate
@@ -131,7 +131,7 @@ jobs:
         run: security delete-keychain "$RUNNER_TEMP/build.keychain" || true
 
       - name: Upload watcher artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: watcher
           path: dist/*.zip
@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Ensure zsh is available
         run: |
@@ -165,7 +165,7 @@ jobs:
           zsh -f bin/make-watcher-linux "$TAG"
 
       - name: Download watcher artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: watcher
           path: dist
@@ -183,7 +183,7 @@ jobs:
           cat RELEASE_NOTES.md
 
       - name: Create GitHub release and upload asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           body_path: RELEASE_NOTES.md
