@@ -136,7 +136,7 @@ tail -f ~/Library/Logs/zac-watch-macos.log
 make watcher-uninstall
 ```
 
-If you do not want to build it, download `zac-watch-macos-<tag>-macos-universal.zip` from the [latest release](https://github.com/alberti42/zsh-appearance-control/releases/latest): a signed and notarized universal binary. [`watchers/macos/README.md`](watchers/macos/README.md) describes how to install it by hand, and the remaining settings.
+If you do not want to build it, download [`zac-watch-macos-universal.zip`](https://github.com/alberti42/zsh-appearance-control/releases/latest/download/zac-watch-macos-universal.zip) from the latest release: a signed and notarized universal binary. [`watchers/macos/README.md`](watchers/macos/README.md) describes how to install it by hand, and the remaining settings.
 
 ### Linux: zac-watch-linux
 
@@ -159,7 +159,7 @@ journalctl --user -u zac-watch-linux -f   # systemd launcher only
 make watcher-uninstall
 ```
 
-You can also download it as `zac-watch-linux-<tag>.zip` from the [latest release](https://github.com/alberti42/zsh-appearance-control/releases/latest). See [`watchers/linux/README.md`](watchers/linux/README.md) for the backends, the two launchers and troubleshooting.
+You can also download it as [`zac-watch-linux.zip`](https://github.com/alberti42/zsh-appearance-control/releases/latest/download/zac-watch-linux.zip) from the latest release. See [`watchers/linux/README.md`](watchers/linux/README.md) for the backends, the two launchers and troubleshooting.
 
 ### What `IO_CMD` does at install time
 

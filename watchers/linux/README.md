@@ -147,8 +147,8 @@ Overrides, same names as the macOS target:
 
 ### By hand
 
-Download `zac-watch-linux-<tag>.zip` from the [latest release](https://github.com/alberti42/zsh-appearance-control/releases/latest) and unzip
-it. In the zip, `zac-watch-linux.service.in` sits next to the script, not in
+Download [`zac-watch-linux.zip`](https://github.com/alberti42/zsh-appearance-control/releases/latest/download/zac-watch-linux.zip) from the
+latest release and unzip it. In the zip, `zac-watch-linux.service.in` sits next to the script, not in
 `systemd/`.
 
 ```zsh

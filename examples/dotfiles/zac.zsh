@@ -4,7 +4,7 @@
 #
 # Source:      zinit/src/zac/zac.zsh  (a private dotfiles repo)
 # Snapshot:    2026-10-30
-# Tested with: zsh-appearance-control main at 52b900c (unreleased, after v2.2.1)
+# Tested with: zsh-appearance-control v2.3.0
 #
 # Snapshots are allowed to diverge from their originals — the private copy
 # keeps evolving. What must not go stale is the 'Tested with' line: it is a
