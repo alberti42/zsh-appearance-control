@@ -165,7 +165,8 @@ function test_gsettings_monitor_reacts_to_every_line() {
   export ZAC_WATCH_BACKEND=gsettings
   gnome default
   start_watcher
-  assert_contains "$(<$FAKE_DESKTOP/calls)" "gsettings monitor org.gnome.desktop.interface color-scheme"
+  # The monitor starts after the startup dispatch is logged.
+  wait_for '[[ $(<$FAKE_DESKTOP/calls) == *"gsettings monitor org.gnome.desktop.interface color-scheme"* ]]'
   gnome prefer-dark
   print -r -- "color-scheme: 'prefer-dark'" >> $FAKE_DESKTOP/gsettings-events
   wait_for '[[ $(<$T/log) == *"change: dispatched 1 (dark)"* ]]'

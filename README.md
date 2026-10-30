@@ -18,16 +18,17 @@
 You switch macOS or GNOME to dark
   │
   ▼
-watcher             zac-watch-macos, zac-watch-linux, tmux hooks or WezTerm
-  │  runs: appearance-dispatch dispatch 1
-  ▼
-appearance-dispatch
-  1. runs your io script once (ZAC_IO_CMD)   → rewrites config files: tmux, btop, …
-  2. writes 1 to ~/.cache/zac/appearance     → Neovim and Emacs watch this file
-  3. sends USR1 to every shell that loaded the plugin
+watcher (e.g., zac-watch-macos, zac-watch-linux, tmux hooks, WezTerm, or a user-provided one)
+  1. runs: appearance-dispatch dispatch 1
   │
   ▼
-each zsh            runs your callbacks      → FZF_DEFAULT_OPTS, LS_COLORS, prompt, …
+appearance-dispatch
+  2. runs your io script once (ZAC_IO_CMD)            → rewrites config files: tmux, btop, …
+  3. writes 1 to ~/.cache/zac/appearance              → Neovim and Emacs watch this file
+  4. sends USR1 to every shell that loaded the plugin → they updates their env. variables
+  │
+  ▼
+each zsh runs your callbacks                          → FZF_DEFAULT_OPTS, LS_COLORS, prompt, …
 ```
 
 There are three parts:
