@@ -2,10 +2,9 @@
 
 [![tests Linux](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/tests-linux.yml?branch=main&label=tests%20Linux&logo=linux)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/tests-linux.yml)
 
-A systemd **user** service that watches the desktop's light/dark preference and
-calls `appearance-dispatch` when it changes. The Linux counterpart of
-`watchers/macos/zac-watch-macos`, and the same shape: it answers one question —
-*did the appearance change?* — and hands the answer to the dispatcher.
+A systemd **user** service that watches the desktop's light/dark preference. It
+is the Linux counterpart of `watchers/macos/zac-watch-macos`. When the
+appearance changes, it runs the dispatcher with the new value:
 
 ```
 appearance-dispatch dispatch <0|1>
@@ -226,7 +225,7 @@ Common outcomes:
   and `gsettings get org.gnome.desktop.interface color-scheme` by hand.
 - the log says `already dark, skipped` — a trigger arrived but the value did not
   change. Normal: accent-colour and theme changes also touch these settings.
-- *xdg-desktop-portal did not answer; trying gsettings* — the watcher first asks
+- *xdg-desktop-portal did not answer, so the colour scheme is read from gsettings instead* — the watcher first asks
   xdg-desktop-portal for the colour scheme, because it works on every desktop.
   It got no answer, for example because the portal was not running yet when the
   watcher started, so it asked GNOME's `gsettings` instead. On GNOME both give

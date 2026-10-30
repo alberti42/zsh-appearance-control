@@ -3,14 +3,12 @@
 [![tests macOS](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/tests-macos.yml?branch=main&label=tests%20macOS&logo=apple)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/tests-macos.yml)
 [![notarized watcher](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/verify-watcher.yml?label=notarized%20watcher&logo=apple)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/verify-watcher.yml)
 
-A tiny launchd agent that watches the macOS dark/light setting and calls
-`appearance-dispatch` when it changes. It closes the "you need an external
-watcher" gap for people who do not use WezTerm or tmux 3.6 hooks: it works with
-any terminal, including Terminal.app, and it also fires when macOS switches
+A launchd agent that watches the macOS dark/light setting. It works with any
+terminal, including Terminal.app, and it also fires when macOS switches
 appearance automatically at sunset.
 
-It is deliberately dumb. It answers one question — *did the appearance change?* —
-and hands the answer to `bin/appearance-dispatch`:
+When the appearance changes, it runs `bin/appearance-dispatch` with the new
+value:
 
 ```
 appearance-dispatch dispatch <0|1>

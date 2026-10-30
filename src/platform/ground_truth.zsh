@@ -1,6 +1,6 @@
 # Ground truth selection.
 #
-# This function is the single place that answers: "what is dark mode right now?"
+# This function is the only place that reads whether dark mode is on.
 #
 # Ground truth is the file $cfg.cache_dir/appearance, written by
 # bin/appearance-dispatch. Reading it is a builtin read: no fork, so this is
