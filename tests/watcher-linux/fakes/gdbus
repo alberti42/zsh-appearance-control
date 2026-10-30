@@ -1,0 +1,30 @@
+#!/bin/sh
+# Fake gdbus: the xdg-desktop-portal Settings interface, as zac-watch-linux
+# uses it. State lives in $FAKE_DESKTOP:
+#   portal-value      color-scheme: 0 no preference, 1 prefer dark, 2 prefer light.
+#                     Absent: every call fails, as when the portal is not up.
+#   portal-no-readone present: ReadOne fails, as on portals that only have Read.
+#   portal-events     `gdbus monitor` prints each line appended to it.
+#   calls             each invocation is logged here.
+
+echo "gdbus $*" >> "$FAKE_DESKTOP/calls"
+
+case $1 in
+  call)
+    case $* in
+      *Settings.ReadOne*) [ -e "$FAKE_DESKTOP/portal-no-readone" ] && exit 1 ;;
+    esac
+    [ -r "$FAKE_DESKTOP/portal-value" ] || exit 1
+    v=$(cat "$FAKE_DESKTOP/portal-value")
+    case $* in
+      *Settings.ReadOne*) echo "(<uint32 $v>,)" ;;
+      *)                  echo "(<<uint32 $v>>,)" ;;
+    esac
+    ;;
+  monitor)
+    exec tail -n +1 -f "$FAKE_DESKTOP/portal-events"
+    ;;
+  *)
+    exit 1
+    ;;
+esac

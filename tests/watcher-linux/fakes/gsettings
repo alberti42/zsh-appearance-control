@@ -1,0 +1,22 @@
+#!/bin/sh
+# Fake gsettings: the GNOME color-scheme key, as zac-watch-linux uses it.
+# State lives in $FAKE_DESKTOP:
+#   gsettings-value   the key's value: prefer-dark, prefer-light or default.
+#                     Absent: every call fails, as without the GNOME schema.
+#   gsettings-events  `gsettings monitor` prints each line appended to it.
+#   calls             each invocation is logged here.
+
+echo "gsettings $*" >> "$FAKE_DESKTOP/calls"
+
+case $1 in
+  get)
+    [ -r "$FAKE_DESKTOP/gsettings-value" ] || exit 1
+    echo "'$(cat "$FAKE_DESKTOP/gsettings-value")'"
+    ;;
+  monitor)
+    exec tail -n +1 -f "$FAKE_DESKTOP/gsettings-events"
+    ;;
+  *)
+    exit 1
+    ;;
+esac
