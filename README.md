@@ -4,51 +4,51 @@
   <img src="logo/logo-zsh-appearance-control.png" alt="zsh-appearance-control logo" width="250" />
 </p>
 
-`zsh-appearance-control` makes switching between light and dark terminal themes feel smooth, and helps keep your shells and tools in sync with your OS appearance.
+`zsh-appearance-control` keeps your shells and terminal tools in step with the light/dark appearance of macOS or of your Linux desktop. Switch the system to dark mode, and every open zsh switches, together with tmux, Neovim, Emacs, and any tool whose config file you choose to rewrite.
 
-It gives you two things:
+## What happens when you switch appearance
 
-1) a shared, always-updated “dark or light?” flag, kept in a small cache file
-2) a safe way to nudge running shells to resync when that flag changes
+```
+You switch macOS or GNOME to dark
+  │
+  ▼
+watcher             zac-watch-macos, zac-watch-linux, tmux hooks or WezTerm
+  │  runs: appearance-dispatch dispatch 1
+  ▼
+appearance-dispatch
+  1. runs your io script once (ZAC_IO_CMD)   → rewrites config files: tmux, btop, …
+  2. writes 1 to ~/.cache/zac/appearance     → Neovim and Emacs watch this file
+  3. sends USR1 to every shell that loaded the plugin
+  │
+  ▼
+each zsh            runs your callbacks      → FZF_DEFAULT_OPTS, LS_COLORS, prompt, …
+```
 
-tmux is not required, and nothing in this plugin reads or writes a tmux option. If you do use tmux, it can act as the watcher that detects the theme change (see [watcher options](#watcher-options)), and it can be themed like any other consumer (see [tmux](#tmux-theme-switching-with-dark_appearance)).
+There are three parts:
 
-This README also includes minimal, working examples of what that enables:
+1. **A watcher** notices that the appearance changed. This project ships one for macOS (`zac-watch-macos`, a launch agent) and one for Linux (`zac-watch-linux`, a systemd user service); both are attached to every [release](https://github.com/alberti42/zsh-appearance-control/releases/latest). tmux 3.6 or newer and WezTerm can do the same job from their own config. See [Choose a watcher](#choose-a-watcher).
+2. **The dispatcher**, `bin/appearance-dispatch`, is the script every watcher calls. It runs your io script, writes the cache file and signals the shells.
+3. **The plugin**, loaded in each zsh, receives the signal, reads the cache file and runs your callbacks.
 
-- tmux as a watcher, and tmux theme switching — see [watcher options](#watcher-options) and [tmux](#tmux-theme-switching-with-dark_appearance)
-- Neovim auto theme switching (by watching the appearance file) — see [Neovim](#neovim-switch-running-instances-on-change)
-- Emacs auto theme switching (by watching the appearance file) — see [Emacs](#emacs-auto-theme-switching)
+The cache file `$ZAC_CACHE_DIR/appearance` (default `~/.cache/zac/appearance`) is the single source of truth. It holds `1` for dark and `0` for light. The plugin reads it with a zsh builtin, so it never slows your prompt down, and any other program can read or watch it.
 
-It’s designed to be calm and predictable:
+The plugin does not ask the OS for the appearance and does not poll. Without a watcher, `zac dark`, `zac light` and `zac toggle` change the OS appearance and update the shell you typed them in; other shells keep their old value.
 
-- it does not constantly poll your system
-- it does not run heavy commands every time your prompt is drawn
-- it updates when something tells it “the appearance changed”
+## Quick start
 
-## Is this plugin for you?
+1. [Install the plugin](#install-the-plugin).
+2. Install the watcher for your OS, from the repository directory:
 
-This plugin is for people who like their terminal to feel coherent.
+   ```zsh
+   make watcher-install
+   ```
 
-If you switch your system between light and dark mode, you probably want more than just the terminal window to change: you want tmux to pick a matching theme, you want your prompt to adjust, and you may want tools like fzf to use different colors.
+   On macOS this builds the watcher with the Swift toolchain (Xcode command line tools). On Linux it needs GNOME 42 or newer, or a desktop whose `xdg-desktop-portal` implements `org.freedesktop.appearance` (KDE Plasma 5.24+).
+3. Open a new terminal, switch the system appearance, and run `zac status`. It prints `1` for dark and `0` for light.
 
-The hard part is that your shell doesn’t automatically hear about OS appearance changes.
-So most setups end up either polling (slow and annoying) or having a handful of custom scripts that don’t quite agree.
+Your shells now know the appearance. To make your tools follow it, see [Make your tools follow](#make-your-tools-follow).
 
-`zsh-appearance-control` gives you a clean place to store “dark or light?” and a simple way to react when it changes.
-You can wire it to a theme-change hook (tmux and WezTerm both offer one), or you can change appearance manually with `zac`.
-
-## How it works (in plain words)
-
-Your terminal (or a tiny helper you run) notices when the system appearance changes.
-It then nudges your shells.
-
-Inside each shell, the plugin keeps a small cached value (`0` or `1`) and runs your callback (optional) so you can adjust your shell environment.
-
-There is exactly one place the plugin reads from: the cache file `$ZAC_CACHE_DIR/appearance` in your user cache directory. It holds `1` for dark and `0` for light. Reading it needs no external command, so it never slows your prompt down.
-
-No tmux option is involved. If you theme tmux, you set `@dark_appearance` yourself from your `ZAC_IO_CMD` script; see [tmux](#tmux-theme-switching-with-dark_appearance).
-
-## Install
+## Install the plugin
 
 However you install it, set any `ZAC_*` environment variables *before* the plugin is loaded (usually in your `.zshrc`, above the plugin line).
 
@@ -73,23 +73,15 @@ plugins=(... zsh-appearance-control)
 zinit lucid wait light-mode for \
     wait'0' \
     atinit"export ZAC_IMMEDIATE_CALLBACK_FNC=my_immediate_callback" \
-    atload'zac sync && my_immediate_callback "$REPLY"' \
+    atload'_zac.sync; my_immediate_callback "${_zac[state.is_dark]}"' \
     path/to/zsh-appearance-control
 ```
 
-<details>
-<summary><strong>A few things worth noting</strong></summary>
-
-- `wait'0'` defers loading until after the first prompt, so the plugin does not slow down shell startup. If your prompt theme needs the appearance applied before the very first draw, load the plugin earlier (remove `wait` entirely or use a lower turbo stage).
+- `wait'0'` defers loading until after the first prompt, so the plugin does not slow down shell startup. If your prompt theme needs the appearance applied before the very first draw, remove `wait`.
 - `atinit` sets `ZAC_IMMEDIATE_CALLBACK_FNC` before the plugin is sourced.
-- `atload` runs `zac sync` once after the plugin loads to read the current appearance, then calls your immediate callback directly to apply it to the current shell. `zac sync` stores the result in `$REPLY`, so passing it straight to the callback avoids a second query.
-- `ZAC_IO_CMD` is read by `bin/appearance-dispatch`, not by the plugin. Set it via `env` in your watcher (e.g. WezTerm) — not here. See [Connecting it to your terminal](#connecting-it-to-your-terminal-the-watcher).
+- `atload` reads the cache file once and applies it to the new shell; see the next section.
 
-</details>
-
-For `my_immediate_callback`, see [If you want your shell to react](#if-you-want-your-shell-to-react).
-
-### DIY (no plugin manager)
+### Manual
 
 Clone the repo anywhere you like, then source the entry file from `.zshrc`:
 
@@ -97,29 +89,145 @@ Clone the repo anywhere you like, then source the entry file from `.zshrc`:
 source "/path/to/zsh-appearance-control/zsh-appearance-control.plugin.zsh"
 ```
 
-After installing, restart your terminal (or start a new shell).
+### Start each shell with the current appearance
 
-## Everyday use
+The plugin reads the cache file when a signal arrives, not when it loads. A shell that opens after the last change therefore starts with no value, which counts as light. Read the file once, right after the plugin loads:
 
-Most people don’t interact with the plugin directly. You either:
+```zsh
+_zac.sync                                          # read the cache file
+my_immediate_callback "${_zac[state.is_dark]}"     # only if you defined one
+```
 
-- let your terminal handle appearance changes (recommended), or
-- manually switch with `zac`.
+In the zinit example above, these two lines are the `atload` ice. `_zac.sync` is already loaded; `zac sync` does the same but first sources the CLI module, which costs about 3 ms per shell.
 
-### The `zac` command
+## Choose a watcher
 
-The plugin provides a `zac` command:
+Something must call `bin/appearance-dispatch` when the appearance changes. That something is the *watcher*. Pick one; they all end in the same call.
 
-- `zac status` prints `1` for dark and `0` for light. If the value is unknown, it still prints `0` and exits with a non-zero status.
-- `zac sync` refreshes the cached value from the cache file.
-- `zac dark`, `zac light`, `zac toggle` ask your OS to switch appearance, and then update the current shell immediately.
+| Watcher | Detects | Good when |
+|---|---|---|
+| [`zac-watch-macos`](#macos-zac-watch-macos) | the OS appearance | macOS, any terminal, including the automatic sunset switch |
+| [`zac-watch-linux`](#linux-zac-watch-linux) | the desktop colour scheme | GNOME 42+, or any desktop with the appearance portal |
+| [tmux hooks](#tmux-hooks-tmux-36-or-newer) | the theme of the attached terminal | you work inside tmux, also over ssh |
+| [WezTerm](#wezterm) | the OS appearance | you use WezTerm |
+| [your own](#your-own-watcher) | whatever you query | none of the above fits |
 
-On macOS, switching is done via the system appearance setting.
-On Linux, GNOME is supported via the GNOME setting.
+### macOS: zac-watch-macos
 
-### If you want your shell to react
+A small Swift program in `watchers/macos/` that runs as a launch agent. It observes the system appearance notification and calls the dispatcher, so it works with any terminal (Terminal.app, iTerm2, Ghostty), and it also fires when macOS switches appearance automatically at sunset.
 
-The plugin gives you three hooks. The right one depends on what you are trying to do.
+```zsh
+cd /path/to/zsh-appearance-control
+make watcher-install IO_CMD=$HOME/path/to/your/io-script   # IO_CMD is optional
+```
+
+This builds the binary into `~/.local/bin`, writes `~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist`, and loads it.
+
+```zsh
+make watcher-status                       # is it loaded?
+tail -f ~/Library/Logs/zac-watch-macos.log
+make watcher-uninstall
+```
+
+If you do not want to build it, each release attaches a signed and notarized universal binary as `zac-watch-macos-<tag>-macos-universal.zip`; [`watchers/macos/README.md`](watchers/macos/README.md) describes how to install it by hand, and the remaining settings.
+
+### Linux: zac-watch-linux
+
+A zsh script in `watchers/linux/` that watches the desktop colour-scheme preference over D-Bus. There is nothing to build.
+
+It requires a desktop that has such a preference: **GNOME 42 or newer** (Ubuntu 22.04+, Fedora 36+), or any desktop whose `xdg-desktop-portal` implements `org.freedesktop.appearance` (KDE Plasma 5.24+). It must run inside the graphical session.
+
+```zsh
+cd /path/to/zsh-appearance-control
+make watcher-install IO_CMD=$HOME/path/to/your/io-script   # IO_CMD is optional
+```
+
+`make` chooses how the watcher starts: as a systemd user service when your session is integrated with `systemd --user`, as an XDG autostart entry when it is not (NX, xrdp, VNC). Force one with `LINUX_LAUNCHER=systemd|autostart`.
+
+```zsh
+make watcher-status
+journalctl --user -u zac-watch-linux -f   # systemd launcher only
+make watcher-uninstall
+```
+
+Each release attaches it as `zac-watch-linux-<tag>.zip`. See [`watchers/linux/README.md`](watchers/linux/README.md) for the backends, the two launchers and troubleshooting.
+
+### What `IO_CMD` does at install time
+
+The watcher runs outside your shell, so it cannot see variables you export in `.zshrc`. `make watcher-install` writes the values it needs into the launcher (the plist, the systemd unit or the autostart entry):
+
+- `IO_CMD=…` becomes `ZAC_IO_CMD`, your [io script](#config-files-the-io-script). Without it the watcher updates the appearance file and signals your shells and nothing else: config files (tmux, btop, editors) stop following the theme. The install prints a note when it is missing.
+- `ZAC_CACHE_DIR` is taken from the environment you run `make` in, so run it from a shell where your plugin settings are loaded.
+
+To change either later, run `make watcher-install` again.
+
+### tmux hooks (tmux 3.6 or newer)
+
+tmux asks the terminal about its theme and fires a hook when it changes. This works for local sessions, and also for a session you attached over ssh, because the report comes from your local terminal through the same connection. On terminals that do not report their theme (mode 2031), tmux guesses it from the background colour.
+
+Add this to your tmux config, with the path adjusted to your install:
+
+```tmux
+ZAC_BIN="$HOME/path/to/zsh-appearance-control/bin/appearance-dispatch"
+
+# Optional: your io script. Drop the env prefix if you have none.
+ZAC_IO="$HOME/path/to/your/io-script"
+
+set-hook -g client-dark-theme  "run-shell -b 'env ZAC_IO_CMD=$ZAC_IO $ZAC_BIN dispatch 1'"
+set-hook -g client-light-theme "run-shell -b 'env ZAC_IO_CMD=$ZAC_IO $ZAC_BIN dispatch 0'"
+```
+
+- `run-shell` runs `/bin/sh` with the environment of the tmux **server**, so use an absolute path for the dispatcher and pass `ZAC_IO_CMD` explicitly.
+- `-b` runs the command in the background, so tmux never waits for it.
+- The hooks also fire when a client attaches, which is what you want after a restart.
+- Check your version with `tmux -V`, and check the hooks exist with `tmux show-hooks -g | grep theme`.
+- If nothing happens, your terminal probably does not report theme changes and the background-colour guess did not trigger. Use one of the other watchers.
+
+### WezTerm
+
+WezTerm can run a command when the system appearance changes:
+
+```lua
+local wezterm = require 'wezterm'
+local home = os.getenv('HOME')
+
+local function scheme_for_appearance(appearance)
+  local is_dark = appearance:find('Dark') ~= nil
+
+  -- WezTerm is a GUI app: it does not inherit your shell environment, so pass
+  -- ZAC_IO_CMD explicitly, and extend PATH with the directories your io script
+  -- needs (e.g. /opt/homebrew/bin). Drop the ZAC_IO_CMD line if you have none.
+  wezterm.run_child_process({
+    'env',
+    'PATH=/opt/homebrew/bin:' .. os.getenv('PATH'),
+    'ZAC_IO_CMD=' .. home .. '/path/to/your/io-script',
+    home .. '/path/to/zsh-appearance-control/bin/appearance-dispatch',
+    'dispatch', is_dark and '1' or '0',
+  })
+
+  return is_dark and 'My Dark Scheme' or 'My Light Scheme'
+end
+
+wezterm.on('window-config-reloaded', function(window, pane)
+  local overrides = window:get_config_overrides() or {}
+  overrides.color_scheme = scheme_for_appearance(window:get_appearance())
+  window:set_config_overrides(overrides)
+end)
+```
+
+### Your own watcher
+
+Any program can be the watcher. When the appearance changes, it runs:
+
+```
+/path/to/zsh-appearance-control/bin/appearance-dispatch dispatch <1|0>
+```
+
+with `ZAC_IO_CMD` (and `ZAC_CACHE_DIR`, if you changed it) in its environment. Calling it twice with the same value is harmless: the io script runs only on a real change.
+
+## Make your tools follow
+
+There are three places to hook in. The right one depends on what you are trying to do.
 
 | Hook | Runs | Use for |
 |---|---|---|
@@ -127,17 +235,11 @@ The plugin gives you three hooks. The right one depends on what you are trying t
 | `ZAC_IMMEDIATE_CALLBACK_FNC` | In every shell, immediately on signal | Updating env vars and shell settings |
 | `ZAC_DEFERRED_CALLBACK_FNC` | In every shell, at the next prompt | Prompt redraws, anything heavier |
 
-**`ZAC_IO_CMD`** is an executable path, not a shell function. The dispatcher runs it once per appearance change (under a lock, idempotent) before signaling any shell. Use it for anything that writes to files on disk: tool config files, theme files, JSON settings. By the time shells receive the signal, the files are already updated. If it exits with a non-zero status the entire pipeline is aborted — no shells are signaled.
+Programs that watch files, such as Neovim and Emacs, need none of these: they watch the cache file.
 
-Must be a single executable path. If you need to pass arguments or set environment variables, write a small wrapper script. Use `#!/bin/zsh` (without `-f`) as the shebang so that your `.zshenv` is sourced automatically and your usual environment variables are available.
+### Shell settings: the callbacks
 
-`ZAC_IO_CMD` is read by `bin/appearance-dispatch`, not by the plugin. If your watcher is an external process that does not inherit your shell environment (such as WezTerm), you must pass `ZAC_IO_CMD` explicitly via `env` when invoking the dispatcher — exporting it in your `.zshrc` or plugin config has no effect on that invocation. See the WezTerm example below.
-
-```zsh
-export ZAC_IO_CMD=/path/to/your/io-script
-```
-
-**`ZAC_IMMEDIATE_CALLBACK_FNC`** is a shell function called directly inside the signal handler in every shell, before the next prompt redraws. Use it for lightweight, instant in-shell updates.
+**`ZAC_IMMEDIATE_CALLBACK_FNC`** is a shell function called directly inside the signal handler in every shell, before the next prompt redraws. It receives `1` for dark and `0` for light.
 
 Allowed: `export`, `typeset`, `zstyle`, and `source` of files that only contain variable assignments.
 Not allowed: I/O, subshells, pipes, or external commands — these can hang or corrupt shell state inside a signal handler.
@@ -156,7 +258,7 @@ my_immediate_callback() {
 export ZAC_IMMEDIATE_CALLBACK_FNC=my_immediate_callback
 ```
 
-**`ZAC_DEFERRED_CALLBACK_FNC`** is a shell function called at the next `precmd`/`preexec` boundary in every shell. Safe for anything: prompt redraws, plugin reconfiguration, external tool calls. Use it when you need to do something heavier in-shell that can wait until the next prompt.
+**`ZAC_DEFERRED_CALLBACK_FNC`** is a shell function called at the next `precmd`/`preexec` boundary in every shell. Safe for anything: prompt redraws, plugin reconfiguration, external tool calls.
 
 ```zsh
 my_deferred_callback() {
@@ -167,361 +269,46 @@ my_deferred_callback() {
 export ZAC_DEFERRED_CALLBACK_FNC=my_deferred_callback
 ```
 
-## The dispatcher: `bin/appearance-dispatch`
+### Config files: the io script
 
-The plugin does not try to guess when your system appearance changes.
-Instead, a watcher calls a tiny helper script when the appearance changes.
-
-This repo ships that standalone dispatcher: `bin/appearance-dispatch`. This section describes what it does; [watcher options](#watcher-options) shows who calls it.
-
-### Recommended: `dispatch`
-
-```
-bin/appearance-dispatch dispatch <on|off|1|0|true|false>
-```
-
-This is the unified pipeline. On each call it:
-
-1. Runs `ZAC_IO_CMD` once if the appearance changed (skipped if already applied — idempotent).
-2. Writes the cache file: the ground truth.
-3. Signals all registered shells with `USR1`.
-
-If `ZAC_IO_CMD` fails, the entire pipeline is aborted — no shells are signaled. This ensures your tool config files and your shells are always in sync.
-
-To pass `ZAC_IO_CMD` from a watcher that does not inherit your shell environment (such as WezTerm), set it via `env`:
-
-```
-env ZAC_IO_CMD=/path/to/your/io-script bin/appearance-dispatch dispatch 1
-```
-
-### Deprecated: `tmux` and `cache`
-
-The older two-call pattern is still accepted, so old watcher scripts keep working:
-
-```
-bin/appearance-dispatch tmux <on|off|1|0|true|false>
-bin/appearance-dispatch cache <on|off|1|0|true|false>
-```
-
-Only the spelling survives. Both run the same unified pipeline as `dispatch`, so all three are interchangeable. In particular the sub-command named `tmux` does **not** set any tmux option any more; since 2.0.0 no part of this project does. Use `dispatch`.
-
-The dispatcher only signals shell processes that have opted in, that is, shells that loaded this plugin and registered themselves. This matters: `USR1` terminates a process that has no handler for it, so signalling an unrelated shell would kill it.
-
-One consequence: a shell that has just started, and has not registered yet, misses that change. It reads the cache file when the plugin loads, so it still ends up with the correct theme.
-
-<details>
-<summary><strong>TL;DR: cache updates (in-place vs atomic)</strong></summary>
-
-The appearance cache file is updated “in place” by default. In plain words: we overwrite the contents of the same file, so it stays the same file on disk. This keeps file watchers simple.
-
-If you set `ZAC_CACHE_ATOMIC=1`, updates become “atomic”: the dispatcher writes a temporary file and then swaps it into place. This is more crash-proof, but given the tiny size of the `0/1` flag a read/write race is extremely unlikely. Choose atomic mode if you want peace of mind that shell scripts always read a valid value.
-
-There is a tradeoff: because atomic mode replaces the file each time (the inode changes), tools that watch files (like editor configs) must watch the directory rather than the file itself.
-
-</details>
-
-## Debugging
-
-If you want to see what the plugin is doing, you can turn on debug logging:
-
-```zsh
-export ZAC_DEBUG=1
-```
-
-Then, in one terminal:
-
-```zsh
-zac debug console
-```
-
-This shows a live log stream while you trigger appearance changes.
-
-## Optional extra: ssh-tmux
-
-If enabled (default), this plugin also provides `ssh-tmux`.
-
-It works like `ssh` (same arguments), but it automatically attaches to a remote tmux session and hands your local appearance to the remote host. On the remote host it calls `appearance-dispatch` when that is installed, so remote shells that already run are signalled too; otherwise it writes the remote cache file directly.
-
-You can disable it by setting:
-
-```zsh
-export ZAC_ENABLE_SSH_TMUX=0
-```
-
-You can customize the remote tmux session name (default: `main`):
-
-```zsh
-export ZAC_SSH_TMUX_SESSION=main
-```
-
-### What a remote session does and does not follow
-
-A remote host has no watcher of its own for your local appearance, so what happens depends on tmux:
-
-| Remote session | At connect | While the session stays open |
-|---|---|---|
-| With tmux 3.6 hooks on the remote host | correct | follows your local terminal, because the hook runs there |
-| Plain ssh, or older tmux | correct | stays as it was at connect |
-
-In other words, a plain ssh session gets the appearance you had when you connected, and keeps it. Reconnect to pick up a change. This is a deliberate limit: the alternative is a push channel back into the remote host, which we chose not to build (see `docs/design-tmux-independence.md`).
-
-## Configuration
-
-Configuration is done with environment variables (set them before the plugin is loaded):
-
-- `ZAC_IMMEDIATE_CALLBACK_FNC` name of a function called inside the signal handler (env var assignments only)
-- `ZAC_DEFERRED_CALLBACK_FNC` name of a function called at the next precmd/preexec (safe for anything)
-- `ZAC_IO_CMD` path to an executable run once per appearance change by the dispatcher (heavy I/O)
-- `ZAC_CACHE_DIR` where to store the cache file and the pid registry
-- `ZAC_LINUX_DESKTOP` set to `gnome` to force GNOME support, or `none` to disable it
-- `ZAC_DEBUG` set to `1` to enable debug logging
-- `ZAC_ENABLE_SSH_TMUX` set to `0` to disable the `ssh-tmux` extra
-
-`ZAC_CALLBACK_FNC` is accepted as a legacy alias for `ZAC_DEFERRED_CALLBACK_FNC`.
-
-## Watcher options
-
-The plugin does not detect appearance changes by itself. Something must call `bin/appearance-dispatch`. That something is the *watcher*, and you have several options. Pick whichever fits your setup; they all end in the same single call.
-
-| Watcher | Detects | Good when |
-|---|---|---|
-| tmux hooks | the theme of the attached terminal | you work inside tmux, also over ssh |
-| WezTerm hook | the OS appearance | you use WezTerm, with or without tmux |
-| `zac-watch-macos` launch agent | the OS appearance | macOS, any terminal, including the automatic sunset switch |
-| `zac-watch-linux` systemd service | the desktop colour scheme | GNOME 42+ / any desktop with the appearance portal |
-| your own script or service | whatever you query | your terminal offers no hook |
-| manual `zac dark/light/toggle` | nothing, you decide | you switch by hand |
-
-### Option 1: tmux hooks (tmux 3.6 or newer)
-
-tmux asks the terminal about its theme and fires a hook when it changes. This works for local sessions, and also for a session you attached over ssh, because the report comes from your local terminal through the same connection.
-
-tmux 3.6 added this: it reports dark or light through mode 2031, and on terminals that do not implement that sequence it guesses the theme from the background colour.
-
-Add this to your tmux config, with the path adjusted to your install:
-
-```tmux
-ZAC_BIN="$HOME/path/to/zsh-appearance-control/bin/appearance-dispatch"
-
-# Optional: your heavy-I/O script. Drop the env prefix if you have none.
-ZAC_IO="$HOME/path/to/your/io-script"
-
-set-hook -g client-dark-theme  "run-shell -b 'env ZAC_IO_CMD=$ZAC_IO $ZAC_BIN dispatch 1'"
-set-hook -g client-light-theme "run-shell -b 'env ZAC_IO_CMD=$ZAC_IO $ZAC_BIN dispatch 0'"
-```
-
-Notes:
-
-- `run-shell` runs `/bin/sh` with the environment of the tmux **server**, so use an absolute path for the dispatcher and pass `ZAC_IO_CMD` explicitly.
-- `-b` runs the command in the background, so tmux never waits for it.
-- The hooks also fire when a client attaches, which is what you want after a restart.
-- The hooks need tmux 3.6 or newer. Check with `tmux -V`, and check the hooks exist with `tmux show-hooks -g | grep theme`.
-- If nothing happens, your terminal probably does not report theme changes and the background-colour guess did not trigger. Use one of the other options.
-
-### Option 2: WezTerm appearance hook
-
-WezTerm can run a command when the system appearance changes. Here is a sketch you can adapt:
-
-```lua
-local wezterm = require 'wezterm'
-
-local home = os.getenv('HOME')
-
-local function scheme_for_appearance(appearance)
-  local zac_dispatcher = home .. '/path/to/zsh-appearance-control/bin/appearance-dispatch'
-
-  -- WezTerm is a GUI app and does not inherit the login-shell PATH.
-  -- Tools called by appearance-dispatch (such as tmux) may not be found
-  -- unless you explicitly extend PATH here.
-  -- Common directories to add:
-  --   macOS Homebrew (Apple Silicon): /opt/homebrew/bin
-  --   macOS Homebrew (Intel):         /usr/local/bin
-  --   zinit polaris:                  home .. '/.local/share/zinit/polaris/bin'
-  local tmux_dir = '/opt/homebrew/bin'  -- adjust to match where tmux lives on your system
-  local env_path = tmux_dir .. ':' .. os.getenv('PATH')
-
-  local is_dark = appearance:find('Dark') ~= nil
-  local dark = is_dark and '1' or '0'
-
-  -- Single dispatch call: writes the cache file and signals the registered
-  -- shells.
-  -- Pass ZAC_IO_CMD explicitly — WezTerm does not inherit your shell environment,
-  -- so env vars from .zshenv are not available here.
-  -- Omit the ZAC_IO_CMD line if you have no heavy I/O to run.
-  wezterm.run_child_process({
-    'env',
-    'PATH=' .. env_path,
-    'ZAC_IO_CMD=' .. home .. '/path/to/your/io-script',  -- optional
-    zac_dispatcher, 'dispatch', dark,
-  })
-
-  return is_dark and 'My Dark Scheme' or 'My Light Scheme'
-end
-
-wezterm.on('window-config-reloaded', function(window, pane)
-  local overrides = window:get_config_overrides() or {}
-  overrides.color_scheme = scheme_for_appearance(window:get_appearance())
-  window:set_config_overrides(overrides)
-end)
-```
-
-### Option 3: the macOS launch agent (zac-watch-macos)
-
-A small Swift agent shipped in `watchers/macos/`. It observes the system
-appearance notification and calls the dispatcher, so it is terminal-agnostic:
-it works in Terminal.app, iTerm2, Ghostty, and it also fires when macOS switches
-appearance automatically at sunset.
-
-```zsh
-cd /path/to/zsh-appearance-control
-make watcher-install \
-  IO_CMD=$HOME/path/to/your/io-script          # your heavy-I/O script, if you have one
-```
-
-`IO_CMD` is optional, but without it the watcher updates the appearance file and
-signals your shells and nothing else: config files (tmux, btop, editors) stop
-following the theme. The install prints a note when it is missing.
-
-`make watcher-install` installs the watcher for the machine it runs on — the same
-command on macOS and Linux. On macOS it builds the binary into `~/.local/bin`, writes
-`~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist`, and loads it
-in the `gui/` domain. The agent then runs
-`appearance-dispatch dispatch <0|1>` on every change, with `ZAC_IO_CMD`, `PATH`
-and any other variable taken from the plist.
-
-```zsh
-make watcher-status                       # is it loaded?
-tail -f ~/Library/Logs/zac-watch-macos.log
-make watcher-uninstall
-```
-
-A prebuilt universal binary is attached to each release as
-`zac-watch-macos-<tag>-macos-universal.zip`. See
-[`watchers/macos/README.md`](watchers/macos/README.md) for the full description,
-the environment variables (`ZAC_DISPATCH`, `ZAC_WATCH_DEBOUNCE_MS`,
-`ZAC_WATCH_RETRY_MS`), the `PATH` discussion and manual installation.
-
-### Option 4: the Linux systemd user service (zac-watch-linux)
-
-The Linux counterpart, in `watchers/linux/`. It is a zsh script — nothing to
-build — and it watches the desktop colour-scheme preference over D-Bus.
-
-Requires a desktop that has such a preference: **GNOME 42 or newer** (Ubuntu
-22.04+, Fedora 36+), or any desktop whose `xdg-desktop-portal` implements
-`org.freedesktop.appearance` (KDE Plasma 5.24+). It must run inside the
-graphical session, because both backends need the session D-Bus.
-
-```zsh
-cd /path/to/zsh-appearance-control
-make watcher-install \
-  IO_CMD=$HOME/path/to/your/io-script          # your heavy-I/O script, if you have one
-```
-
-On Linux that also chooses the launcher for you: the systemd unit when your
-session is integrated with `systemd --user`, the XDG autostart entry when it is
-not (NX, xrdp, VNC). Force one with `LINUX_LAUNCHER=systemd|autostart`.
-
-That installs `~/.local/bin/zac-watch-linux` and
-`~/.config/systemd/user/zac-watch-linux.service`, then enables and starts it.
-
-```zsh
-make watcher-linux-status
-journalctl --user -u zac-watch-linux -f
-make watcher-linux-uninstall
-```
-
-It prefers the `xdg-desktop-portal` backend and falls back to
-`gsettings monitor org.gnome.desktop.interface color-scheme`. Each release
-attaches it as `zac-watch-linux-<tag>.zip`. See
-[`watchers/linux/README.md`](watchers/linux/README.md) for the backends, the
-environment variables and the restart semantics.
-
-## tmux: theme switching with @dark_appearance
-
-tmux is a consumer of the appearance, like Neovim, Emacs or fzf. Neither the plugin nor the dispatcher touches any tmux option: you set `@dark_appearance` from your `ZAC_IO_CMD` script, and your tmux theme reads it.
+`ZAC_IO_CMD` is the path of an executable that the dispatcher runs once per appearance change, before signaling any shell, as `<script> <0|1>`. Use it for anything that writes to files on disk: tool config files, theme files, JSON settings. By the time shells receive the signal, the files are already updated.
 
 ```zsh
 #!/bin/zsh
-# ZAC_IO_CMD script, called as: <script> <0|1>
-command tmux set-option -gq @dark_appearance "$1" 2>/dev/null
+# Called by appearance-dispatch as: <script> <0|1>
+is_dark=$1
+
+# tmux: set the option your tmux theme reads (see the tmux section).
+command tmux set-option -gq @dark_appearance "$is_dark" 2>/dev/null
+
+# Add one block per tool that keeps its theme in a config file.
+
+exit 0
 ```
 
-Your io script only runs on a real transition, so a tmux server that starts later has no option set. Read the file once at server start to cover that:
+- `ZAC_IO_CMD` is read by `bin/appearance-dispatch`, not by the plugin. Give it to your watcher (`make watcher-install IO_CMD=…`, or `env ZAC_IO_CMD=…` in a tmux or WezTerm hook); exporting it in `.zshrc` has no effect.
+- It must be a single executable path. If you need to pass arguments or set environment variables, write a small wrapper script.
+- Use `#!/bin/zsh` (without `-f`) as the shebang so that your `.zshenv` is sourced and your usual `PATH` and variables are available.
+- **A non-zero exit aborts the whole dispatch**: the cache file is not written and no shell is signaled. Make each step skip a tool that is not installed on this host rather than fail.
+
+### tmux
+
+tmux is a consumer of the appearance, like Neovim, Emacs or fzf. Neither the plugin nor the dispatcher touches any tmux option: you set `@dark_appearance` from your io script (the example above does), and your tmux theme reads it.
+
+Your io script only runs on a real change, so a tmux server that starts later has no option set. Read the file once at server start to cover that:
 
 ```tmux
 run-shell -b 'f="${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/zac}/appearance"; \
   [ -r "$f" ] && tmux set-option -gq @dark_appearance "$(cat "$f")"'
 ```
 
-The key idea is simple:
+Then define your theme colours in terms of `@dark_appearance` (`1` for dark, `0` for light). [`examples/tmux/catppuccin.conf`](examples/tmux/catppuccin.conf) is a complete theme you can copy; it is also attached to each release.
 
-- keep a boolean option in tmux: `@dark_appearance` (`1` for dark, `0` for light)
-- define your theme colors in terms of that flag
+### Neovim
 
-Here is a tiny sketch:
+Neovim can watch the cache file with its built-in libuv bindings (`vim.uv`), so you do not need to install any Neovim plugin. On an older Neovim without `vim.uv`, replace it with `vim.loop`. The technique comes from [Henrik Sommerfeld's write-up](https://www.henriksommerfeld.se/neovim-automatic-light-dark-mode-switcher/).
 
-```tmux
-# ~/.tmux.conf
-source-file "$HOME/.config/tmux/catppuccin.conf"
-```
-
-```tmux
-# ~/.config/tmux/catppuccin.conf
-set-option -g @dark_appearance 0
-```
-
-This repo includes a complete example you can copy and adapt:
-
-- `examples/tmux/catppuccin.conf`
-
-## Neovim: switch running instances on change
-
-If you want Neovim to react to the same appearance changes as your shells, a great approach is to watch a file and react when it changes.
-
-Henrik Sommerfeld has a nice write-up of that file-watching technique for Neovim:
-
-- https://www.henriksommerfeld.se/neovim-automatic-light-dark-mode-switcher/
-
-`zsh-appearance-control` helps by providing a shared, simple “dark or light?” flag that other tools can consume.
-Instead of inventing your own `~/.theme` convention, you can reuse the plugin’s cache file:
-
-- `ZAC_CACHE_DIR/appearance` (default: `~/.cache/zac/appearance`)
-
-That file contains a single character:
-
-- `1` for dark
-- `0` for light
-
-Your watcher updates it by calling `bin/appearance-dispatch dispatch ...`, and then your shells (and Neovim) can react.
-
-Here is a minimal sketch (inspired by the same mechanics Henrik describes) that watches the file and switches Neovim’s background:
-
-This uses Neovim’s built-in file watching (libuv via `vim.uv`), so you do not need to install any extra Neovim plugin.
-If you are on an older Neovim version that does not have `vim.uv`, try replacing it with `vim.loop`.
-
-### Where do I put this?
-
-If you are new to Neovim config, a simple way to try this is:
-
-1) Create a file named `auto-color-scheme.lua` in your Neovim config directory.
-
-On most systems, that directory is:
-
-- `~/.config/nvim/`
-
-So the full path would be:
-
-- `~/.config/nvim/auto-color-scheme.lua`
-
-2) Paste the Lua code below into that file.
-
-3) In your `init.lua`, load it with:
-
-```lua
--- Load auto-color-scheme:
--- watches ZAC_CACHE_DIR/appearance (0/1) and switches colorscheme live.
-dofile(vim.fn.stdpath("config") .. "/auto-color-scheme.lua")
-```
+Save this as `~/.config/nvim/auto-color-scheme.lua`, and load it from `init.lua` with `dofile(vim.fn.stdpath("config") .. "/auto-color-scheme.lua")`:
 
 ```lua
 local uv = vim.uv
@@ -548,11 +335,9 @@ local function apply_mode(mode)
   if mode == '1' then
     vim.o.background = 'dark'
     pcall(vim.cmd.colorscheme, 'catppuccin-macchiato')
-    -- vim.notify("Switching to dark mode 🌘")
   else
     vim.o.background = 'light'
     pcall(vim.cmd.colorscheme, 'catppuccin-frappe')
-    -- vim.notify("Switching to light mode 🌖")
   end
 end
 
@@ -577,24 +362,15 @@ if handle then
 end
 ```
 
-## Emacs: auto theme switching
+### Emacs
 
-This repo ships `editors/emacs/zac-theme-autodetection.el` (also available in [release artifacts](https://github.com/alberti42/zsh-appearance-control/releases/latest)). It watches the zsh-appearance-control appearance file and calls a user-supplied callback whenever the OS appearance changes. It needs no extra packages beyond what Emacs provides.
+[`editors/emacs/zac-theme-autodetection.el`](editors/emacs/zac-theme-autodetection.el) (also attached to each release) watches the cache file and calls a function you supply whenever the appearance changes. It needs no extra packages beyond what Emacs provides. It applies the theme at load time, supports the daemon and `emacsclient` (via `after-make-frame-functions`), and prints a message if file notifications are not supported.
 
-It handles:
-
-- initial application at load time
-- daemon/emacsclient support (via `after-make-frame-functions`)
-- live file watching (via Emacs's built-in `file-notify`), with a graceful fallback message if file notifications are not supported
-
-### Setup
-
-Add the module's directory to your `load-path`, then set `zac-load-theme-callback` **before** loading the module so it is available for the initial application:
+Set `zac-load-theme-callback` **before** loading the module, so it is also used for the initial application:
 
 ```elisp
 (add-to-list 'load-path "/path/to/editors/emacs")
 
-;; Set callback before loading the module.
 ;; It receives :light or :dark.
 (setq zac-load-theme-callback
       (lambda (appearance)
@@ -606,51 +382,106 @@ Add the module's directory to your `load-path`, then set `zac-load-theme-callbac
 (require 'zac-theme-autodetection)
 ```
 
-[modus-operandi](https://protesilaos.com/emacs/modus-themes) (light) and `modus-vivendi-tinted` (dark) are built into Emacs 28+, so no extra package is needed. Swap them for any other theme theme you prefer.
+`modus-operandi` and `modus-vivendi-tinted` are built into Emacs 28+. Swap them for any theme you prefer.
 
-### Optional: harmonizing other faces after theme changes (Emacs 29+)
-
-Some packages do not automatically pick up face changes when a theme switches. In Emacs 29+, you can hook into `enable-theme-functions` to fix up any faces immediately after every `load-theme` call:
+Some packages do not pick up face changes when a theme switches. In Emacs 29+, fix their faces in `enable-theme-functions`, and register the hook before loading the module so it also runs on the initial application:
 
 ```elisp
 (defun my/harmonize-theme (&rest _)
-  "Re-apply custom face settings after every theme change.
-Add any face customizations that your packages need here."
-  ;; Example: blend git-gutter background with the line-number column.
-  ;; (when (facep 'git-gutter:added)
-  ;;   (let ((bg (face-background 'line-number nil t)))
-  ;;     (dolist (face '(git-gutter:added git-gutter:modified
-  ;;                     git-gutter:deleted git-gutter:unchanged))
-  ;;       (when (facep face)
-  ;;         (set-face-background face bg)))))
+  "Re-apply custom face settings after every theme change."
+  ;; e.g. (set-face-background 'git-gutter:added (face-background 'line-number nil t))
   )
 
-;; Fire on every theme change (Emacs 29+).
 (add-hook 'enable-theme-functions #'my/harmonize-theme)
 ```
 
-Define and register this hook **before** loading `zac-theme-autodetection.el` so it also fires on the initial theme application.
+### A complete real-world setup
 
-Now, whenever your watcher updates `ZAC_CACHE_DIR/appearance` (via `bin/appearance-dispatch dispatch ...`), Emacs will follow along.
-
-## Goodies: a complete real-world setup
-
-Everything above documents one extension point at a time. If you would rather see
-them all working together, [`examples/dotfiles/`](examples/dotfiles/) holds the
-author's actual configuration — a snapshot from a private dotfiles repository,
-warts included:
+[`examples/dotfiles/`](examples/dotfiles/) holds the author's actual configuration — a snapshot from a private dotfiles repository, warts included. It shows every hook above working together:
 
 | File | Role |
 |---|---|
-| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load with turbo mode, state primed at load time with `_zac.sync` (not `zac sync`, which would source the lazy CLI module at every startup), and a `ZAC_IMMEDIATE_CALLBACK_FNC` that stays inside the "assignments only" rule (`LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight`, completion colours) |
-| [`zac-io-cmd.zsh`](examples/dotfiles/zac-io-cmd.zsh) | a `ZAC_IO_CMD` that rewrites configs for yazi, btop, patina, claude, opencode and IPython, flips the vivid `LS_COLORS` and git-theme symlinks, and — the part worth copying — treats "this tool is not installed here" as a skip rather than a failure, because a non-zero exit aborts the whole dispatch |
-| [`zac-tmux-cmd.zsh`](examples/dotfiles/zac-tmux-cmd.zsh) | the tmux options that live in the server's memory, in one helper shared by the io script and by `tmux.conf` at server start |
+| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load, state primed at load with `_zac.sync`, and an immediate callback that sets `LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight` and completion colours |
+| [`zac-io-cmd.zsh`](examples/dotfiles/zac-io-cmd.zsh) | an io script that rewrites configs for yazi, btop, patina, claude, opencode and IPython, and skips a tool that is not installed rather than failing |
+| [`zac-tmux-cmd.zsh`](examples/dotfiles/zac-tmux-cmd.zsh) | the tmux options, in one helper shared by the io script and by `tmux.conf` at server start |
 
-These are reading material, not a drop-in: they assume that repository's paths,
-helpers and tool list. See [`examples/dotfiles/README.md`](examples/dotfiles/README.md)
-for what to copy, what to replace, and how the three fit together.
+These are reading material, not a drop-in: they assume that repository's paths, helpers and tool list. See [`examples/dotfiles/README.md`](examples/dotfiles/README.md) for what to copy and what to replace.
+
+## Remote hosts: ssh-tmux
+
+The plugin provides `ssh-tmux`. It works like `ssh` (same arguments), but it attaches to a remote tmux session (default name `main`) and hands your local appearance to the remote host. On the remote host it calls `appearance-dispatch` when that is installed, so remote shells that already run are signalled too; otherwise it writes the remote cache file directly.
+
+| Remote session | At connect | While the session stays open |
+|---|---|---|
+| With tmux 3.6 hooks on the remote host | correct | follows your local terminal, because the hook runs there |
+| Plain ssh, or older tmux | correct | stays as it was at connect |
+
+A plain ssh session gets the appearance you had when you connected, and keeps it. Reconnect to pick up a change. The design note [`docs/design-tmux-independence.md`](docs/design-tmux-independence.md) explains why.
+
+## Reference
+
+### The `zac` command
+
+- `zac status` prints `1` for dark and `0` for light. If the value is unknown, it still prints `0` and exits with a non-zero status.
+- `zac sync` refreshes the cached value from the cache file.
+- `zac dark`, `zac light`, `zac toggle` ask your OS to switch appearance (macOS, or GNOME through `gsettings`), and then update the current shell immediately. Other shells follow when your watcher reports the change.
+- `zac debug console` shows a live log stream; see [Debugging](#debugging).
+
+### Configuration
+
+Set these before the plugin is loaded:
+
+| Variable | Meaning |
+|---|---|
+| `ZAC_IMMEDIATE_CALLBACK_FNC` | name of a function called inside the signal handler (env var assignments only) |
+| `ZAC_DEFERRED_CALLBACK_FNC` | name of a function called at the next precmd/preexec (safe for anything) |
+| `ZAC_CACHE_DIR` | where to store the cache file and the pid registry (default `$XDG_CACHE_HOME/zac`, else `~/.cache/zac`) |
+| `ZAC_LINUX_DESKTOP` | `gnome` to force GNOME support for `zac dark/light`, `none` to disable it |
+| `ZAC_DEBUG` | `1` to enable debug logging |
+| `ZAC_ENABLE_SSH_TMUX` | `0` to disable `ssh-tmux` |
+| `ZAC_SSH_TMUX_SESSION` | remote tmux session name for `ssh-tmux` (default `main`) |
+
+`ZAC_CALLBACK_FNC` is accepted as a legacy alias for `ZAC_DEFERRED_CALLBACK_FNC`.
+
+These are read by `bin/appearance-dispatch`, so they belong in the watcher's environment:
+
+| Variable | Meaning |
+|---|---|
+| `ZAC_IO_CMD` | path to an executable run once per appearance change, called as `<script> <0|1>` |
+| `ZAC_CACHE_DIR` | as above; must match the plugin's value |
+| `ZAC_CACHE_ATOMIC` | `1` to replace the cache file on each write instead of overwriting it in place |
+
+### `bin/appearance-dispatch`
+
+```
+bin/appearance-dispatch dispatch <on|off|1|0|true|false>
+```
+
+On each call it:
+
+1. Runs `ZAC_IO_CMD` once if the appearance changed (skipped if already applied).
+2. Writes the cache file.
+3. Signals all registered shells with `USR1`.
+
+If `ZAC_IO_CMD` fails, the pipeline stops after step 1: no cache write, no signals. Your config files and your shells therefore never disagree.
+
+The dispatcher only signals shells that loaded this plugin and registered themselves. `USR1` terminates a process that has no handler for it, so signalling an unrelated shell would kill it.
+
+The sub-commands `tmux` and `cache` are deprecated spellings of `dispatch`, kept so that old watcher scripts keep working. Neither sets a tmux option.
+
+By default the cache file is overwritten in place, so it stays the same file on disk and tools can watch the file itself. With `ZAC_CACHE_ATOMIC=1` the dispatcher writes a temporary file and renames it into place, so a reader never sees a half-written value; tools must then watch the directory, because the file is replaced on every write.
+
+### Debugging
+
+```zsh
+export ZAC_DEBUG=1    # before the plugin loads
+zac debug console     # in one terminal: live log while you switch appearance
+```
+
+For the watchers, see the log commands in [Choose a watcher](#choose-a-watcher) and the debugging sections of [`watchers/macos/README.md`](watchers/macos/README.md#debugging) and [`watchers/linux/README.md`](watchers/linux/README.md#debugging).
 
 ## Author
+
 - **Author:** Andrea Alberti
 - **GitHub Profile:** [alberti42](https://github.com/alberti42)
 - **Donations:** [![Buy Me a Coffee](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-orange)](https://buymeacoffee.com/alberti)
