@@ -355,9 +355,12 @@ function _zac.init() {
       # Read cache file immediately for instant state update.
       local _zac_trap_val='' _zac_trap_file=${_zac[cfg.cache_dir]}/appearance
       IFS= read -r _zac_trap_val <"$_zac_trap_file" 2>/dev/null || _zac_trap_val=''
-      case $_zac_trap_val in
-        (0|1) _zac[state.is_dark]=$_zac_trap_val ;;
-      esac
+      # The value is updated here, so the sync at the next prompt sees no
+      # change: flag the deferred callback here too.
+      if [[ $_zac_trap_val == (0|1) && $_zac_trap_val != ${_zac[state.is_dark]} ]]; then
+        _zac[state.is_dark]=$_zac_trap_val
+        _zac[state.needs_propagate]=1
+      fi
 
       # Immediate callback — env var assignments only.
       local _zac_trap_imm=${_zac[cfg.immediate_callback_fnc]:-}

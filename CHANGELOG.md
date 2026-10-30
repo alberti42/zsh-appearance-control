@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ZAC_DEFERRED_CALLBACK_FNC` did not run after a change delivered by `USR1`.**
+  Since 1.1.0 the signal handler writes the new value into the shell's state
+  itself, so the sync at the next prompt saw no change and skipped the callback.
+  The handler now flags the callback when the value changes. Found by the new
+  tests.
+
 ### Changed
 
 - **A new shell starts with the current appearance.** The plugin reads the cache
