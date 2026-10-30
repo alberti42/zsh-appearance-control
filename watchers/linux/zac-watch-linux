@@ -300,7 +300,9 @@ typeset -gi DETECT_TRIES DETECT_WAIT_S
 
 _int_env ZAC_WATCH_DEBOUNCE_MS 200; DEBOUNCE_S=$(( REPLY / 1000.0 ))
 _int_env ZAC_WATCH_RETRY_MS   3000; RETRY_MS=$REPLY
-_int_env ZAC_WATCH_PORTAL_TIMEOUT_MS 3000; PORTAL_TIMEOUT_S=$(( REPLY / 1000.0 ))
+# `gdbus --timeout` takes whole seconds and rejects `3.`, which is what
+# `REPLY / 1000.0` gives: round up instead, to at least 1 s.
+_int_env ZAC_WATCH_PORTAL_TIMEOUT_MS 3000; PORTAL_TIMEOUT_S=$(( REPLY > 0 ? (REPLY + 999) / 1000 : 1 ))
 _int_env ZAC_WATCH_DETECT_TRIES  5; DETECT_TRIES=$REPLY
 _int_env ZAC_WATCH_DETECT_WAIT_S 3; DETECT_WAIT_S=$REPLY
 

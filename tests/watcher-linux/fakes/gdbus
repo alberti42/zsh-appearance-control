@@ -9,6 +9,18 @@
 
 echo "gdbus $*" >> "$FAKE_DESKTOP/calls"
 
+# Like the real gdbus: --timeout takes whole seconds, and anything else, such
+# as `3.`, is a usage error.
+prev=
+for arg in "$@"; do
+  if [ "$prev" = --timeout ]; then
+    case $arg in
+      ''|*[!0-9]*) echo "Usage: gdbus call [OPTION…] (--timeout: not an integer: $arg)" >&2; exit 1 ;;
+    esac
+  fi
+  prev=$arg
+done
+
 case $1 in
   call)
     case $* in

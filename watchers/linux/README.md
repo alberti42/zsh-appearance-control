@@ -169,7 +169,7 @@ The watcher reads only these:
 | `ZAC_WATCH_RETRY_MS` | `3000` | delay before the single retry of a failed dispatch; `0` disables it |
 | `ZAC_WATCH_MONITOR_CMD` | — | custom backend: prints one line per change, never exits |
 | `ZAC_WATCH_READ_CMD` | — | custom backend: prints `1` or `0` |
-| `ZAC_WATCH_PORTAL_TIMEOUT_MS` | `3000` | timeout of a portal call. `gdbus` waits 25 s by default, which makes the fallback to `gsettings` look like a hang at login |
+| `ZAC_WATCH_PORTAL_TIMEOUT_MS` | `3000` | timeout of a portal call, rounded up to whole seconds because `gdbus` takes seconds. `gdbus` waits 25 s by default, which makes the fallback to `gsettings` look like a hang at login |
 | `ZAC_WATCH_DETECT_TRIES` | `5` | detection passes before giving up |
 | `ZAC_WATCH_DETECT_WAIT_S` | `3` | wait between detection passes |
 

@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`zac-watch-linux` never used the portal backend.** It passed the portal
+  timeout to `gdbus` as `3.` (`3000 / 1000.0` in zsh), which `gdbus` rejects
+  as a usage error, so every portal call failed. On GNOME the watcher fell
+  back to `gsettings` and still worked; on a desktop with only the portal, such
+  as KDE, it found no backend. The timeout is now rounded up to whole seconds.
+  Broken since the watcher was added in 2.2.0; found by the real-desktop tests.
+
 - **`ZAC_DEFERRED_CALLBACK_FNC` did not run after a change delivered by `USR1`.**
   Since 1.1.0 the signal handler writes the new value into the shell's state
   itself, so the sync at the next prompt saw no change and skipped the callback.
