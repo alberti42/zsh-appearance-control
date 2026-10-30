@@ -219,30 +219,74 @@ ZAC_WATCH_BACKEND=gsettings ZAC_DISPATCH=/path/to/appearance-dispatch \
 journalctl --user -u zac-watch-linux -n 50 --no-pager
 ```
 
-Common outcomes:
+Lines you may find in the log (`journalctl --user -u zac-watch-linux`), and what
+they mean:
 
-- *no session D-Bus* — the service was started outside the graphical session.
-  Check `systemctl --user show-environment | grep DBUS`, and that the unit is
-  wanted by `graphical-session.target`.
-- *no usable backend* — neither the portal setting nor the GNOME key answered.
-  Try `gdbus call --session --dest org.freedesktop.portal.Desktop --object-path /org/freedesktop/portal/desktop --method org.freedesktop.portal.Settings.ReadOne org.freedesktop.appearance color-scheme`
-  and `gsettings get org.gnome.desktop.interface color-scheme` by hand.
-- the log says `already dark, skipped` — a trigger arrived but the value did not
-  change. Normal: accent-colour and theme changes also touch these settings.
-- *xdg-desktop-portal did not answer, so the colour scheme is read from gsettings instead* — the watcher first asks
-  xdg-desktop-portal for the colour scheme, because it works on every desktop.
-  It got no answer, for example because the portal was not running yet when the
-  watcher started, so it asked GNOME's `gsettings` instead. On GNOME both give
-  the same answer, so you can ignore this message. To make the watcher wait for
-  the portal instead, set `ZAC_WATCH_BACKEND=portal`; it then retries
-  `ZAC_WATCH_DETECT_TRIES` times.
-- *no backend yet (attempt n/5)* — the session is still coming up. The watcher
-  retries rather than dying, so it does not burn the unit's start limit during a
-  slow login.
-- `ZAC_IO_CMD failed; aborting` in the journal is **your** io script failing, not
-  the watcher: the dispatcher then writes no ground truth and signals no shell,
-  by design. A script shared with macOS often needs guards on Linux — check that
-  every file it rewrites exists on this host.
+- The log says:
+
+  ```
+  zac-watch-linux: no session D-Bus (DBUS_SESSION_BUS_ADDRESS is unset).
+  This watcher must run inside the graphical session: bind the unit to
+  graphical-session.target, not default.target.
+  ```
+
+  The service was started outside the graphical session. Check
+  `systemctl --user show-environment | grep DBUS`, and that the unit is wanted
+  by `graphical-session.target`.
+- The log says:
+
+  ```
+  zac-watch-linux: no usable backend (asked for: auto).
+  Needs the xdg-desktop-portal org.freedesktop.appearance setting, or GNOME 42+
+  with org.gnome.desktop.interface color-scheme. Is DBUS_SESSION_BUS_ADDRESS set?
+  ```
+
+  Neither xdg-desktop-portal nor `gsettings` gave the colour scheme. Ask them by
+  hand:
+
+  ```zsh
+  gdbus call --session --dest org.freedesktop.portal.Desktop --object-path /org/freedesktop/portal/desktop --method org.freedesktop.portal.Settings.ReadOne org.freedesktop.appearance color-scheme
+  gsettings get org.gnome.desktop.interface color-scheme
+  ```
+- The log says:
+
+  ```
+  zac-watch-linux: change: already dark, skipped
+  ```
+
+  The desktop reported a change, but the colour scheme is the same as before.
+  This is normal: changing the accent colour or the theme also touches these
+  settings.
+- The log says:
+
+  ```
+  zac-watch-linux: xdg-desktop-portal did not answer, so the colour scheme is read from gsettings instead
+  ```
+
+  On GNOME nothing is wrong: `gsettings` gives the same colour scheme as
+  xdg-desktop-portal. The watcher asks xdg-desktop-portal first because it
+  works on every desktop, and the portal may not be running yet when the
+  watcher starts. To make the watcher wait for the portal instead, set
+  `ZAC_WATCH_BACKEND=portal`; it then retries `ZAC_WATCH_DETECT_TRIES` times.
+- The log says:
+
+  ```
+  zac-watch-linux: no backend yet (attempt 1/5); waiting 3s
+  ```
+
+  The session is still starting. The watcher tries again instead of exiting, so
+  a slow login does not use up the unit's start limit.
+- The log says:
+
+  ```
+  appearance-dispatch: ZAC_IO_CMD failed; aborting
+  zac-watch-linux: change: dispatcher failed
+  ```
+
+  **Your** io script failed, not the watcher. The dispatcher then writes no
+  ground truth and signals no shell, by design. A script shared with macOS
+  often needs guards on Linux: check that every file it rewrites exists on
+  this host.
 
 The `custom` backend is also the test harness: point it at a script that prints
 a line per change and another that prints the state, and the whole loop can be
