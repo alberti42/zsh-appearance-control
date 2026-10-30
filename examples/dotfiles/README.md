@@ -42,8 +42,8 @@ options, and re-running the whole io script would be wasteful.
 **From `zac.zsh`** — the inline callback obeys the hard rule for
 `ZAC_IMMEDIATE_CALLBACK_FNC`: assignments and `zstyle` only, no subshells, no
 external commands, no output. It runs inside `TRAPUSR1`, so anything heavier can
-wedge the shell. Its `atload` line, which reads the cache file and runs the
-callback at load, is not needed after v2.2.1: the plugin now does both itself.
+wedge the shell. The zinit load needs only `atinit`: the plugin reads the cache
+file and runs the callback itself when it loads.
 
 **From `zac-io-cmd.zsh`** — the three-way status per step: `0` applied, `2`
 skipped because the tool is not installed on this host, `1` real failure, and

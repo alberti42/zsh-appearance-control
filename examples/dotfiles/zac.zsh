@@ -3,8 +3,8 @@
 # EXAMPLE — not a drop-in.
 #
 # Source:      zinit/src/zac/zac.zsh  (a private dotfiles repo)
-# Snapshot:    2026-08-19
-# Tested with: zsh-appearance-control v2.2.0
+# Snapshot:    2026-10-30
+# Tested with: zsh-appearance-control main at 52b900c (unreleased, after v2.2.1)
 #
 # Snapshots are allowed to diverge from their originals — the private copy
 # keeps evolving. What must not go stale is the 'Tested with' line: it is a
@@ -12,11 +12,9 @@
 # so it is bumped by hand after re-testing, never automatically.
 #
 # What it demonstrates
-#   - loading the plugin with zinit, turbo mode, and priming the state at load
-#     time, so the very first prompt is already themed. The prime calls
-#     `_zac.sync` (in core.zsh, already loaded) rather than `zac sync`: the `zac`
-#     command is a lazy stub, so calling it at startup sources the CLI module and
-#     undoes the laziness for no gain;
+#   - loading the plugin with zinit, turbo mode. `atinit` sets
+#     ZAC_IMMEDIATE_CALLBACK_FNC before the plugin is sourced; the plugin then
+#     reads the cache file and runs the callback itself, so no `atload` is needed;
 #   - a ZAC_IMMEDIATE_CALLBACK_FNC that obeys the contract: variable assignments
 #     and zstyle only — no subshells, no external commands, no output. It runs
 #     inside TRAPUSR1, where anything heavier can wedge the shell.
@@ -96,6 +94,5 @@ function __my_appearance_immediate() {
   zinit lucid wait light-mode for \
       wait'0' \
       atinit"export ZAC_IMMEDIATE_CALLBACK_FNC=__my_appearance_immediate" \
-      atload'_zac.sync; __my_appearance_immediate "${_zac[state.is_dark]}"' \
       $__local_plugin_path/zsh-appearance-control
 }
