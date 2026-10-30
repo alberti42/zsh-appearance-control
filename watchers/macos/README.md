@@ -72,11 +72,14 @@ make watcher-install \
 
 ## Install by hand
 
-1. Copy the binary somewhere on your `PATH`, e.g. `~/.local/bin/zac-watch-macos`.
-2. Substitute the `@…@` placeholders in
-   `launchd/com.github.alberti42.zac-watch-macos.plist.in` and write the result to
+1. Download `zac-watch-macos-<tag>-macos-universal.zip` from the
+   [latest release](https://github.com/alberti42/zsh-appearance-control/releases/latest) and unzip it, or build the binary (see [Build](#build)).
+2. Copy the binary somewhere on your `PATH`, e.g. `~/.local/bin/zac-watch-macos`.
+3. Substitute the `@…@` placeholders in
+   `launchd/com.github.alberti42.zac-watch-macos.plist.in` (in the zip, next to
+   the binary) and write the result to
    `~/Library/LaunchAgents/com.github.alberti42.zac-watch-macos.plist`.
-3. Load it:
+4. Load it:
 
 ```zsh
 launchctl bootstrap gui/$(id -u) \
