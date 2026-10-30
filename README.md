@@ -111,13 +111,15 @@ Something must call `bin/appearance-dispatch` when the appearance changes. That 
 
 | Watcher | Detects | Good when |
 |---|---|---|
-| [`zac-watch-macos`](#macos-zac-watch-macos) | the OS appearance | macOS, any terminal, including the automatic sunset switch |
-| [`zac-watch-linux`](#linux-zac-watch-linux) | the desktop colour scheme | GNOME 42+, or any desktop with the appearance portal |
+| [`zac-watch-macos`](watchers/macos/README.md) | the OS appearance | macOS, any terminal, including the automatic sunset switch |
+| [`zac-watch-linux`](watchers/linux/README.md) | the desktop colour scheme | GNOME 42+, or any desktop with xdg-desktop-portal |
 | [tmux hooks](#tmux-hooks-tmux-36-or-newer) | the theme of the attached terminal | you work inside tmux, also over ssh |
 | [WezTerm](#wezterm) | the OS appearance | you use WezTerm |
 | [your own](#your-own-watcher) | whatever you query | none of the above fits |
 
 ### macOS: zac-watch-macos
+
+**Full documentation:** [zac-watch-macos manual](watchers/macos/README.md)
 
 A small Swift program in `watchers/macos/` that runs as a launch agent. It observes the system appearance notification and calls the dispatcher, so it works with any terminal (Terminal.app, iTerm2, Ghostty), and it also fires when macOS switches appearance automatically at sunset.
 
@@ -137,6 +139,8 @@ make watcher-uninstall
 If you do not want to build it, each release attaches a signed and notarized universal binary as `zac-watch-macos-<tag>-macos-universal.zip`; [`watchers/macos/README.md`](watchers/macos/README.md) describes how to install it by hand, and the remaining settings.
 
 ### Linux: zac-watch-linux
+
+**Full documentation:** [zac-watch-linux manual](watchers/linux/README.md)
 
 A zsh script in `watchers/linux/` that watches the desktop colour-scheme preference over D-Bus. There is nothing to build.
 

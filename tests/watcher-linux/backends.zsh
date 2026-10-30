@@ -94,7 +94,7 @@ function test_auto_falls_back_to_gsettings_when_the_portal_is_silent() {
   gnome prefer-dark
   run zsh -f $WATCH_LINUX --print
   assert_rc 0
-  assert_contains "$out" "the appearance portal did not answer; trying gsettings"
+  assert_contains "$out" "xdg-desktop-portal did not answer; trying gsettings"
   assert_eq "${out##*$'\n'}" 1
 }
 

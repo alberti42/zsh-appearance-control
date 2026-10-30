@@ -201,7 +201,7 @@ graphical-session.target, not default.target." 3
     return 0
   fi
   [[ $want == auto ]] && (( $+commands[gdbus] )) \
-    && _log "the appearance portal did not answer; trying gsettings"
+    && _log "xdg-desktop-portal did not answer; trying gsettings"
 
   if [[ $want == (auto|gsettings) ]] && (( $+commands[gsettings] )) && _gsettings_read >/dev/null; then
     BACKEND=gsettings

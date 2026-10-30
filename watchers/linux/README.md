@@ -1,5 +1,7 @@
 # zac-watch-linux
 
+[![tests Linux](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/tests-linux.yml?branch=main&label=tests%20Linux&logo=linux)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/tests-linux.yml)
+
 A systemd **user** service that watches the desktop's light/dark preference and
 calls `appearance-dispatch` when it changes. The Linux counterpart of
 `watchers/macos/zac-watch-macos`, and the same shape: it answers one question —
@@ -224,11 +226,13 @@ Common outcomes:
   and `gsettings get org.gnome.desktop.interface color-scheme` by hand.
 - the log says `already dark, skipped` — a trigger arrived but the value did not
   change. Normal: accent-colour and theme changes also touch these settings.
-- *the appearance portal did not answer; trying gsettings* — the portal is D-Bus
-  activated and is often not up yet a second after login, which is exactly when
-  this service starts. On GNOME the `gsettings` backend is equivalent, so this is
-  harmless; force `ZAC_WATCH_BACKEND=portal` if you want the service to wait for
-  the portal instead (it will retry `ZAC_WATCH_DETECT_TRIES` times).
+- *xdg-desktop-portal did not answer; trying gsettings* — the watcher first asks
+  xdg-desktop-portal for the colour scheme, because it works on every desktop.
+  It got no answer, for example because the portal was not running yet when the
+  watcher started, so it asked GNOME's `gsettings` instead. On GNOME both give
+  the same answer, so you can ignore this message. To make the watcher wait for
+  the portal instead, set `ZAC_WATCH_BACKEND=portal`; it then retries
+  `ZAC_WATCH_DETECT_TRIES` times.
 - *no backend yet (attempt n/5)* — the session is still coming up. The watcher
   retries rather than dying, so it does not burn the unit's start limit during a
   slow login.
