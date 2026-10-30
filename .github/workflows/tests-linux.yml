@@ -1,0 +1,26 @@
+name: Tests (Linux)
+
+# One workflow per platform, so that each has its own README badge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install zsh
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
+
+      - name: Run the tests
+        run: |
+          zsh --version
+          make test

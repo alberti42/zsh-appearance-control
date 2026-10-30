@@ -1,0 +1,90 @@
+name: Verify Released Watcher
+
+# Checks the zac-watch-macos binary attached to the latest published release —
+# the file users download — the way a user's Mac would:
+#   1. Code signature: valid, hardened runtime, and made with the Developer ID
+#      of team 9V3X7C8VCK.
+#   2. Notarization: Gatekeeper accepts the binary as "Notarized Developer ID".
+#      The ticket is not stapled (a bare Mach-O cannot carry one), so Gatekeeper
+#      asks Apple online, as a Mac does the first time it runs the binary. A
+#      binary signed with the same Developer ID but not notarized is reported
+#      as "Unnotarized Developer ID" and fails this step.
+#   3. The binary is universal, runs, and reports the version of the release.
+#
+# Runs when a release is published, weekly, and on demand. A check can fail
+# with no new release, for example if Apple revokes the certificate.
+# The README badge has no branch filter, so it follows the latest run of any
+# of the three triggers. Needs no secrets.
+
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read   # download the release asset
+
+jobs:
+  verify:
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO:     ${{ github.repository }}
+      TEAM_ID:  9V3X7C8VCK
+
+    steps:
+      - name: Download the latest release
+        id: rel
+        run: |
+          set -euo pipefail
+          # Without a tag, gh picks the latest release: not a draft, not a pre-release.
+          TAG=$(gh release view --repo "$REPO" --json tagName -q .tagName)
+          gh release download "$TAG" --repo "$REPO" \
+            --pattern 'zac-watch-macos-*-macos-universal.zip'
+          shasum -a 256 zac-watch-macos-*.zip
+          ditto -x -k zac-watch-macos-*.zip extracted
+          BIN=$(find extracted -type f -name zac-watch-macos)
+          test -n "$BIN"
+          echo "Latest release: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "bin=$BIN" >> "$GITHUB_OUTPUT"
+
+      - name: Verify code signature, hardened runtime and team
+        env:
+          BIN: ${{ steps.rel.outputs.bin }}
+        run: |
+          set -euo pipefail
+          codesign --verify --strict --verbose=2 "$BIN"
+          INFO=$(codesign -dv "$BIN" 2>&1)
+          echo "$INFO"
+          TEAM=$(echo "$INFO" | sed -n 's/^TeamIdentifier=//p')
+          test "$TEAM" = "$TEAM_ID"
+          echo "$INFO" | grep -q 'flags=.*(runtime)'
+
+      - name: Verify notarization
+        env:
+          BIN: ${{ steps.rel.outputs.bin }}
+        run: |
+          set -euo pipefail
+          # `--type execute` assesses apps only and rejects a bare binary with
+          # "does not seem to be an app"; the primary-signature context
+          # assesses the binary itself.
+          OUT=$(spctl --assess --type open --context context:primary-signature \
+                  --verbose=4 "$BIN" 2>&1) || true
+          echo "$OUT"
+          echo "$OUT" | grep -q "source=Notarized Developer ID"
+
+      - name: Verify the binary runs and reports the release version
+        env:
+          BIN: ${{ steps.rel.outputs.bin }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ARCHS=$(lipo -archs "$BIN")
+          echo "Architectures: $ARCHS"
+          [[ $ARCHS == *arm64* && $ARCHS == *x86_64* ]]
+          VERSION=$("$BIN" --version)
+          echo "$VERSION"
+          test "$VERSION" = "zac-watch-macos ${TAG#v}"

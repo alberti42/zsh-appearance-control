@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tests** for the plugin, `bin/appearance-dispatch`, `zac-watch-linux` and
   `zac-watch-macos`: `make test`, or `zsh -f tests/run`. Plain zsh with a small
   runner, no framework to install. CI runs them on Ubuntu and macOS.
+- **README badges** for the tests on each platform, the notarization of the
+  released `zac-watch-macos`, the latest release and the license. The latter comes from a new workflow,
+  `verify-watcher.yml`, which downloads the binary of the latest release and
+  checks its Developer ID signature, hardened runtime, notarization and
+  version, when a release is published and every Monday.
 
 ### Fixed
 

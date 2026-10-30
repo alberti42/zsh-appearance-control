@@ -1,4 +1,6 @@
-name: Tests
+name: Tests (macOS)
+
+# One workflow per platform, so that each has its own README badge.
 
 on:
   push:
@@ -8,24 +10,13 @@ on:
 
 jobs:
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install zsh
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zsh
-
       # Without the binary its tests are skipped, not failed.
       - name: Build the macOS watcher
-        if: runner.os == 'macOS'
         run: make watcher-macos
 
       - name: Run the tests

@@ -1,5 +1,11 @@
 # zac (zsh-appearance-control)
 
+[![tests macOS](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/tests-macos.yml?branch=main&label=tests%20macOS&logo=apple)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/tests-macos.yml)
+[![tests Linux](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/tests-linux.yml?branch=main&label=tests%20Linux&logo=linux)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/tests-linux.yml)
+[![notarized watcher](https://img.shields.io/github/actions/workflow/status/alberti42/zsh-appearance-control/verify-watcher.yml?label=notarized%20watcher&logo=apple)](https://github.com/alberti42/zsh-appearance-control/actions/workflows/verify-watcher.yml)
+[![release](https://img.shields.io/github/v/release/alberti42/zsh-appearance-control)](https://github.com/alberti42/zsh-appearance-control/releases/latest)
+[![license](https://img.shields.io/github/license/alberti42/zsh-appearance-control)](LICENSE)
+
 <p align="center">
   <img src="logo/logo-zsh-appearance-control.png" alt="zsh-appearance-control logo" width="250" />
 </p>
@@ -480,7 +486,7 @@ make test            # or: zsh -f tests/run [-v] [test-file...]
 
 The tests cover the plugin, `bin/appearance-dispatch` and both watchers. Each test runs in its own temporary directory with its own `ZAC_CACHE_DIR`, and your `ZAC_*` variables are unset first, so a run never touches your real setup. The Linux watcher is tested through its `custom` backend, so those tests need no desktop and also run on macOS. On macOS, one test posts the system's appearance-change notification; an installed `zac-watch-macos` sees it, finds the appearance unchanged, and skips.
 
-CI runs them on Ubuntu and macOS (`.github/workflows/tests.yml`).
+CI runs them on Ubuntu and macOS (`.github/workflows/tests-linux.yml`, `.github/workflows/tests-macos.yml`). A third workflow, `.github/workflows/verify-watcher.yml`, downloads the `zac-watch-macos` of the latest release and checks its signature and notarization; it runs when a release is published and every Monday.
 
 ## Author
 
