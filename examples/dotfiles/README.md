@@ -42,9 +42,8 @@ options, and re-running the whole io script would be wasteful.
 **From `zac.zsh`** — the inline callback obeys the hard rule for
 `ZAC_IMMEDIATE_CALLBACK_FNC`: assignments and `zstyle` only, no subshells, no
 external commands, no output. It runs inside `TRAPUSR1`, so anything heavier can
-wedge the shell. Note also the load line: `atload'zac sync && __my_appearance_immediate "$REPLY"'`
-primes the state at load time, so the first prompt is already themed rather than
-waiting for the first change.
+wedge the shell. Its `atload` line, which reads the cache file and runs the
+callback at load, is not needed after v2.2.1: the plugin now does both itself.
 
 **From `zac-io-cmd.zsh`** — the three-way status per step: `0` applied, `2`
 skipped because the tool is not installed on this host, `1` real failure, and

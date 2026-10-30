@@ -155,6 +155,10 @@ function _zac.init.state() {
   # needs_sync: 1 => hooks call _zac.sync at the next opportunity.
   : ${_zac[state.needs_sync]:=0}
 
+  # needs_immediate: 1 => run the immediate callback at the next precmd/preexec.
+  # Set at load when the callback function is not defined yet.
+  : ${_zac[state.needs_immediate]:=0}
+
   # needs_propagate: 1 => run _zac.propagate at the next safe opportunity.
   # Set by _zac.sync (when is_dark changes) and by the first prompt after load.
   : ${_zac[state.needs_propagate]:=0}
@@ -282,8 +286,7 @@ function _zac.init.shell() {
   (( ${+_zac[guard.shell_inited]} )) && return 0
   _zac[guard.shell_inited]=1
 
-  # Do not force a sync on init. Sync should be triggered explicitly (USR1 or
-  # `zac sync`) to avoid prompt stalls.
+  # The load-time sync happens in _zac.init.apply, after init.
   _zac[state.needs_propagate]=0
 
   # Defer propagation until the next prompt after plugin load.
@@ -303,7 +306,7 @@ function _zac.init() {
   # - Register zsh integration points (hooks + TRAPUSR1)
   #
   # Non-responsibilities:
-  # - No external queries (tmux/OS) and no sync.
+  # - No external queries (tmux/OS) and no sync: see _zac.init.apply.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   # These are special global hook arrays in zsh.
@@ -428,10 +431,40 @@ function _zac.sync() {
   _zac[state.needs_sync]=0
 }
 
+function _zac.immediate() {
+  # Run the immediate callback with the cached state.
+  #
+  # No emulate: the callback must run with the user's options.
+  # Returns 1 when a callback is configured but its function is not defined.
+  local cb=${_zac[cfg.immediate_callback_fnc]:-}
+  [[ -n $cb ]] || return 0
+  (( $+functions[$cb] )) || return 1
+  $cb ${_zac[state.is_dark]:-0}
+  return 0
+}
+
+function _zac.init.apply() {
+  # Apply the current appearance to a new shell, once, at load.
+  #
+  # Reading the cache file is a builtin read with no fork, so it is cheap
+  # enough for startup. It runs outside _zac.init so that the callback sees
+  # the user's options, not the emulate options of init.
+  #
+  # The callback function may be defined later in .zshrc than the plugin is
+  # loaded; then it runs at the first precmd/preexec instead.
+  _zac.sync
+  _zac.immediate || _zac[state.needs_immediate]=1
+}
+
 function _zac.precmd() {
   # precmd hook: runs right before the prompt is shown.
   # Used to perform deferred sync work and to perform one-time propagation
   # after the initial defer window.
+  if (( _zac[state.needs_immediate] )); then
+    _zac[state.needs_immediate]=0
+    _zac.immediate
+  fi
+
   if (( _zac[state.defer_propagate] )); then
     _zac.debug.log "core | precmd | first prompt"
     _zac[state.defer_propagate]=0
@@ -455,6 +488,11 @@ function _zac.preexec() {
   # preexec hook: runs after Enter, right before executing the command.
   # This helps keep state correct even if a signal arrived while the user was
   # sitting at a prompt (no precmd ran yet).
+  if (( _zac[state.needs_immediate] )); then
+    _zac[state.needs_immediate]=0
+    _zac.immediate
+  fi
+
   if (( _zac[state.needs_sync] )); then
     _zac.debug.log "core | preexec | needs_sync=1"
     _zac.sync
@@ -467,3 +505,4 @@ function _zac.preexec() {
 
 # Self-init when sourced.
 _zac.init
+_zac.init.apply

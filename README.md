@@ -73,13 +73,11 @@ plugins=(... zsh-appearance-control)
 zinit lucid wait light-mode for \
     wait'0' \
     atinit"export ZAC_IMMEDIATE_CALLBACK_FNC=my_immediate_callback" \
-    atload'_zac.sync; my_immediate_callback "${_zac[state.is_dark]}"' \
     path/to/zsh-appearance-control
 ```
 
 - `wait'0'` defers loading until after the first prompt, so the plugin does not slow down shell startup. If your prompt theme needs the appearance applied before the very first draw, remove `wait`.
 - `atinit` sets `ZAC_IMMEDIATE_CALLBACK_FNC` before the plugin is sourced.
-- `atload` reads the cache file once and applies it to the new shell; see the next section.
 
 ### Manual
 
@@ -89,16 +87,9 @@ Clone the repo anywhere you like, then source the entry file from `.zshrc`:
 source "/path/to/zsh-appearance-control/zsh-appearance-control.plugin.zsh"
 ```
 
-### Start each shell with the current appearance
+### What happens when a shell starts
 
-The plugin reads the cache file when a signal arrives, not when it loads. A shell that opens after the last change therefore starts with no value, which counts as light. Read the file once, right after the plugin loads:
-
-```zsh
-_zac.sync                                          # read the cache file
-my_immediate_callback "${_zac[state.is_dark]}"     # only if you defined one
-```
-
-In the zinit example above, these two lines are the `atload` ice. `_zac.sync` is already loaded; `zac sync` does the same but first sources the CLI module, which costs about 3 ms per shell.
+When the plugin loads, it reads the cache file and runs `ZAC_IMMEDIATE_CALLBACK_FNC`, so a new shell starts with the current appearance. If the callback function is not defined yet at that point (because `.zshrc` defines it after loading the plugin), it runs before the first prompt or command instead. `ZAC_DEFERRED_CALLBACK_FNC` runs at the first prompt.
 
 ## Choose a watcher
 
@@ -401,7 +392,7 @@ Some packages do not pick up face changes when a theme switches. In Emacs 29+, f
 
 | File | Role |
 |---|---|
-| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load, state primed at load with `_zac.sync`, and an immediate callback that sets `LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight` and completion colours |
+| [`zac.zsh`](examples/dotfiles/zac.zsh) | zinit load with turbo mode, and an immediate callback that sets `LS_COLORS`, `FZF_DEFAULT_OPTS`, `BAT_CONFIG_PATH`, `zle_highlight` and completion colours |
 | [`zac-io-cmd.zsh`](examples/dotfiles/zac-io-cmd.zsh) | an io script that rewrites configs for yazi, btop, patina, claude, opencode and IPython, and skips a tool that is not installed rather than failing |
 | [`zac-tmux-cmd.zsh`](examples/dotfiles/zac-tmux-cmd.zsh) | the tmux options, in one helper shared by the io script and by `tmux.conf` at server start |
 

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A new shell starts with the current appearance.** The plugin reads the cache
+  file when it loads and runs `ZAC_IMMEDIATE_CALLBACK_FNC` once; if that function
+  is not defined yet, it runs before the first prompt or command instead.
+  Before, a new shell had no value until the first change, unless the user's
+  config called `_zac.sync` itself. The rule against a sync at load dates from
+  when a sync ran `tmux show-options`; since 2.0.0 it is a builtin read of the
+  cache file, with no fork. An existing `atload'_zac.sync; …'` line still works
+  and can be removed.
+
 - **`make watcher-install` now installs the watcher for the machine it runs on.**
   It was the macOS target, so running it on Linux failed with a Swift error, and
   the reader had to know which of three targets applied. On Linux it also picks
