@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a session D-Bus, dconf, `gsettings` and `xdg-desktop-portal` under Xvfb, in a
   separate Linux CI job. They change the desktop colour scheme, so they run
   only with `REAL_DESKTOP_TESTS=1`.
+- **Appearance-change tests for `zac-watch-macos`**
+  (`tests/watcher-macos/appearance.zsh`): they change the appearance on the CI
+  runner, through `defaults` and through System Events, and check that the
+  watcher dispatches the new value, once per burst of notifications, and also
+  when the notification arrives before the setting is written. They run only
+  with `REAL_APPEARANCE_TESTS=1`.
 
 ### Fixed
 

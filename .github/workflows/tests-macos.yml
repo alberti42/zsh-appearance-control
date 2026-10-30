@@ -19,7 +19,11 @@ jobs:
       - name: Build the macOS watcher
         run: make watcher-macos
 
+      # The runner is a throwaway machine, so the tests that change the
+      # appearance (tests/watcher-macos/appearance.zsh) may run here.
       - name: Run the tests
+        env:
+          REAL_APPEARANCE_TESTS: 1
         run: |
           zsh --version
           make test
