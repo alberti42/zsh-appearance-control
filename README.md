@@ -23,19 +23,26 @@ watcher (e.g., zac-watch-macos, zac-watch-linux, tmux hooks, WezTerm, or a user-
   │
   ▼
 appearance-dispatch
-  2. runs your io script once (ZAC_IO_CMD)            → rewrites config files: tmux, btop, …
-  3. writes 1 to ~/.cache/zac/appearance              → Neovim and Emacs watch this file
-  4. sends USR1 to every shell that loaded the plugin → they updates their env. variables
+  2. runs your io script once (ZAC_IO_CMD)     → rewrites config files: tmux, btop, …
+  3. writes 1 to ~/.cache/zac/appearance       → Neovim and Emacs watch this file
+  4. sends USR1 to every shell that loaded the plugin
   │
   ▼
-each zsh runs your callbacks                          → FZF_DEFAULT_OPTS, LS_COLORS, prompt, …
+each zsh that receives USR1
+  5. at once: reads the cache file and runs
+     ZAC_IMMEDIATE_CALLBACK_FNC                → env variables: FZF_DEFAULT_OPTS, LS_COLORS, …
+  6. at the next prompt: runs
+     ZAC_DEFERRED_CALLBACK_FNC                 → prompt redraw, anything heavier
 ```
 
-There are three parts:
+The numbers in the diagram are the steps:
 
-1. **A watcher** notices that the appearance changed. This project ships one for macOS (`zac-watch-macos`, a launch agent) and one for Linux (`zac-watch-linux`, a systemd user service); both are attached to every [release](https://github.com/alberti42/zsh-appearance-control/releases/latest). tmux 3.6 or newer and WezTerm can do the same job from their own config. See [Choose a watcher](#choose-a-watcher).
-2. **The dispatcher**, `bin/appearance-dispatch`, is the script every watcher calls. It runs your io script, writes the cache file and signals the shells.
-3. **The plugin**, loaded in each zsh, receives the signal, reads the cache file and runs your callbacks.
+1. **A watcher** notices that the appearance changed and calls the dispatcher. This project ships one for macOS (`zac-watch-macos`, a launch agent) and one for Linux (`zac-watch-linux`, a systemd user service); both are attached to every [release](https://github.com/alberti42/zsh-appearance-control/releases/latest). tmux 3.6 or newer and WezTerm can do the same job from their own config. See [Choose a watcher](#choose-a-watcher).
+2. **The dispatcher**, `bin/appearance-dispatch`, is the script every watcher calls. It first runs your io script, which rewrites the config files of your tools. See [Config files: the io script](#config-files-the-io-script).
+3. It then writes the cache file.
+4. Finally it signals the shells that loaded **the plugin**.
+5. In each of them, the plugin reads the cache file and calls `ZAC_IMMEDIATE_CALLBACK_FNC` at once, inside the signal handler: this is where environment variables change.
+6. At the next prompt, the plugin calls `ZAC_DEFERRED_CALLBACK_FNC`, for the prompt and anything heavier. See [Shell settings: the callbacks](#shell-settings-the-callbacks).
 
 The cache file `$ZAC_CACHE_DIR/appearance` (default `~/.cache/zac/appearance`) is the single source of truth. It holds `1` for dark and `0` for light. The plugin reads it with a zsh builtin, so it never slows your prompt down, and any other program can read or watch it.
 
