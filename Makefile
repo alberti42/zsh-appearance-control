@@ -68,11 +68,17 @@ WATCHER_LINUX_DESKTOP_IN := $(WATCHER_LINUX_DIR)/autostart/zac-watch-linux.deskt
 DESKTOP_DEST := $(HOME)/.config/autostart/zac-watch-linux.desktop
 LINUX_PATH ?= $(HOME)/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
-.PHONY: bump-version \
+.PHONY: test bump-version \
 	watcher-install watcher-uninstall watcher-status \
 	watcher-macos watcher-macos-install watcher-macos-uninstall watcher-macos-status watcher-macos-clean \
 	watcher-linux-install watcher-linux-uninstall watcher-linux-status \
 	watcher-linux-autostart-install watcher-linux-autostart-uninstall watcher-linux-autostart-status
+
+# The macOS watcher tests skip themselves unless the binary is built
+# (watcher-macos). Pass test files to run only those: make test TESTS=tests/plugin/*.zsh
+TESTS ?=
+test:
+	zsh -f tests/run $(TESTS)
 
 watcher-macos:
 	cd $(WATCHER_DIR) && swift build -c release

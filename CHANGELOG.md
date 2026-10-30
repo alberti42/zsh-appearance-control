@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tests** for the plugin, `bin/appearance-dispatch`, `zac-watch-linux` and
+  `zac-watch-macos`: `make test`, or `zsh -f tests/run`. Plain zsh with a small
+  runner, no framework to install. CI runs them on Ubuntu and macOS.
+
 ### Fixed
 
 - **`ZAC_DEFERRED_CALLBACK_FNC` did not run after a change delivered by `USR1`.**

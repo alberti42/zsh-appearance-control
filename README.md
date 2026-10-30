@@ -471,6 +471,17 @@ zac debug console     # in one terminal: live log while you switch appearance
 
 For the watchers, see the log commands in [Choose a watcher](#choose-a-watcher) and the debugging sections of [`watchers/macos/README.md`](watchers/macos/README.md#debugging) and [`watchers/linux/README.md`](watchers/linux/README.md#debugging).
 
+### Tests
+
+```zsh
+make watcher-macos   # macOS only: the watcher tests need the built binary
+make test            # or: zsh -f tests/run [-v] [test-file...]
+```
+
+The tests cover the plugin, `bin/appearance-dispatch` and both watchers. Each test runs in its own temporary directory with its own `ZAC_CACHE_DIR`, and your `ZAC_*` variables are unset first, so a run never touches your real setup. The Linux watcher is tested through its `custom` backend, so those tests need no desktop and also run on macOS. On macOS, one test posts the system's appearance-change notification; an installed `zac-watch-macos` sees it, finds the appearance unchanged, and skips.
+
+CI runs them on Ubuntu and macOS (`.github/workflows/tests.yml`).
+
 ## Author
 
 - **Author:** Andrea Alberti

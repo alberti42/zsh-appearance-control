@@ -1,0 +1,103 @@
+#!/usr/bin/env zsh
+#
+# Test runner for zsh-appearance-control.
+#
+# usage: tests/run [-v] [test-file...]
+#
+# Runs every tests/<area>/*.zsh file, or only the files given. A test file
+# defines functions named test_*; the runner calls each one in its own
+# subshell, inside a fresh temporary directory $T, with ZAC_CACHE_DIR pointing
+# into it. Nothing leaks from one test to the next, and nothing touches your
+# real cache directory.
+#
+# A test passes when it returns 0, fails when an assertion fails or it returns
+# non-zero, and is skipped when it calls `skip`. With -v the output of every
+# test is shown; otherwise only the output of a failed test.
+
+emulate -LR zsh -o extended_glob -o no_short_loops
+
+typeset -g REPO_ROOT=${0:A:h:h}
+typeset -g TESTS_DIR=$REPO_ROOT/tests
+
+local verbose=0
+if [[ ${1:-} == -v ]]; then
+  verbose=1
+  shift
+fi
+
+local -a files
+if (( $# )); then
+  files=( ${@:A} )
+else
+  files=( $TESTS_DIR/^lib/*.zsh(N) )
+fi
+
+# Your own ZAC_* settings must not reach the code under test.
+unset -m 'ZAC_*'
+
+local tmp_root
+tmp_root=$(command mktemp -d "${TMPDIR:-/tmp}/zac-tests.XXXXXX") || exit 1
+trap 'command rm -rf -- $tmp_root' EXIT
+
+local -i n_pass=0 n_fail=0 n_skip=0
+local file name T log rc reason
+local -a names
+
+for file in $files; do
+  print -r -- "# ${file#$REPO_ROOT/}"
+
+  # List the tests of this file without running its top level here.
+  names=( ${(f)"$(
+    builtin source $TESTS_DIR/lib/helpers.zsh
+    builtin source $file || exit 1
+    print -rl -- ${(ok)functions[(I)test_*]}
+  )"} )
+  if (( $? )) || (( ! $#names )); then
+    (( n_fail++ ))
+    print -r -- "FAIL  ${file:t}: does not load, or defines no test_* function"
+    continue
+  fi
+
+  for name in $names; do
+    T=$tmp_root/${file:t:r}.$name
+    command mkdir -p -- $T
+    log=$T.log
+
+    (
+      builtin cd -q -- $T
+      typeset -g T=$T
+      export ZAC_CACHE_DIR=$T/cache
+      export XDG_CACHE_HOME=$T/xdg-cache
+      builtin source $TESTS_DIR/lib/helpers.zsh
+      builtin source $file
+      $name
+    ) >$log 2>&1 </dev/null
+    rc=$?
+
+    # Background processes a test started with `spawn` must not outlive it.
+    if [[ -r $T/.spawned ]]; then
+      command kill ${(f)"$(<$T/.spawned)"} 2>/dev/null
+    fi
+
+    if (( rc == 0 )); then
+      (( n_pass++ ))
+      print -r -- "ok    $name"
+    elif (( rc == 200 )); then
+      (( n_skip++ ))
+      reason=${"$(<$log)"##*$'\n'}
+      print -r -- "skip  $name: $reason"
+      continue
+    else
+      (( n_fail++ ))
+      print -r -- "FAIL  $name"
+    fi
+
+    if (( rc != 0 || verbose )) && [[ -s $log ]]; then
+      print -r -- "${(F)${(@)${(f)"$(<$log)"}/#/      }}"
+    fi
+  done
+done
+
+print -r -- ""
+print -r -- "$n_pass passed, $n_fail failed, $n_skip skipped"
+(( n_fail == 0 ))
