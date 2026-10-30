@@ -24,3 +24,26 @@ jobs:
         run: |
           zsh --version
           make test
+
+  # zac-watch-linux against a real session D-Bus, dconf, gsettings and
+  # xdg-desktop-portal, to check that the fakes in tests/watcher-linux/fakes
+  # match the real tools. The gtk portal backend needs an X display: Xvfb.
+  real-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install zsh and a headless desktop session
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh dbus dbus-user-session \
+            dconf-service dconf-gsettings-backend gsettings-desktop-schemas \
+            libglib2.0-bin xdg-desktop-portal xdg-desktop-portal-gtk xvfb xauth
+
+      - name: Run the real-desktop tests
+        env:
+          XDG_CURRENT_DESKTOP: GNOME
+        run: |
+          xvfb-run -a dbus-run-session -- \
+            env REAL_DESKTOP_TESTS=1 make test TESTS=tests/watcher-linux/desktop.zsh

@@ -13,10 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `zac-watch-macos`: `make test`, or `zsh -f tests/run`. Plain zsh with a small
   runner, no framework to install. CI runs them on Ubuntu and macOS.
 - **README badges** for the tests on each platform, the notarization of the
-  released `zac-watch-macos`, the latest release and the license. The latter comes from a new workflow,
-  `verify-watcher.yml`, which downloads the binary of the latest release and
-  checks its Developer ID signature, hardened runtime, notarization and
-  version, when a release is published and every Monday.
+  released `zac-watch-macos`, the latest release and the license. The
+  notarization badge comes from a new workflow, `verify-watcher.yml`, which
+  downloads the binary of the latest release and checks its Developer ID
+  signature, hardened runtime, notarization and version, when a release is
+  published and every Monday.
+- **Real-desktop tests for `zac-watch-linux`** (`tests/watcher-linux/desktop.zsh`):
+  a session D-Bus, dconf, `gsettings` and `xdg-desktop-portal` under Xvfb, in a
+  separate Linux CI job. They change the desktop colour scheme, so they run
+  only with `REAL_DESKTOP_TESTS=1`.
 
 ### Fixed
 
