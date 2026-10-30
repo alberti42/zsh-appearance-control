@@ -5,7 +5,7 @@ setopt errexit nounset pipefail
 
 # Build the Linux appearance watcher release artifact.
 #
-# Produces dist/zac-watch-linux-<tag>.zip containing:
+# Produces dist/zac-watch-linux.zip containing:
 #   zac-watch-linux                 the watcher script (mode 755)
 #   zac-watch-linux.service.in      systemd user unit template
 #   zac-watch-linux.desktop.in      XDG autostart template (for sessions that
@@ -19,16 +19,9 @@ setopt errexit nounset pipefail
 #
 # Runs anywhere (no Linux host needed to package it).
 
-function _usage() {
-  print -r -- "usage: $1 <version-tag>" >&2
-  print -r -- "example: $1 v0.1.0" >&2
-}
-
-local version=${1:-}
-if [[ -z $version ]]; then
-  _usage "${0:t}"
-  exit 2
-fi
+# The file name carries no version, so that
+# https://github.com/alberti42/zsh-appearance-control/releases/latest/download/<name>
+# always serves the newest copy.
 
 local repo_root
 repo_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
@@ -59,7 +52,7 @@ command zsh -n "$script" || {
   exit 1
 }
 
-local package_dir="zac-watch-linux-${version}"
+local package_dir="zac-watch-linux"
 local zip_path="$out_dir/${package_dir}.zip"
 
 local tmp

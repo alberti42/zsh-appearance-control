@@ -7,17 +7,6 @@ setopt errexit nounset pipefail
 # Each artifact is a single file attached directly to the GitHub release,
 # without zipping — there is no benefit to wrapping single files in a zip.
 
-function _usage() {
-  print -r -- "usage: $1 <version-tag>" >&2
-  print -r -- "example: $1 v0.1.0" >&2
-}
-
-local version=${1:-}
-if [[ -z $version ]]; then
-  _usage "${0:t}"
-  exit 2
-fi
-
 local repo_root
 repo_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
   print -r -- "${0:t}: must run inside a git repository" >&2

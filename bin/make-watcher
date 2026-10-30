@@ -5,7 +5,7 @@ setopt errexit nounset pipefail
 
 # Build the macOS appearance watcher as a release artifact.
 #
-# Produces dist/zac-watch-macos-<tag>-macos-universal.zip containing:
+# Produces dist/zac-watch-macos-universal.zip containing:
 #   zac-watch-macos                       universal binary (arm64 + x86_64)
 #   com.github.alberti42.zac-watch-macos.plist.in   launchd template
 #   README.md                             install instructions
@@ -24,16 +24,9 @@ setopt errexit nounset pipefail
 # The signature lives inside the Mach-O, so the zip published here and the zip
 # submitted to notarytool carry the same signed bytes.
 
-function _usage() {
-  print -r -- "usage: $1 <version-tag>" >&2
-  print -r -- "example: $1 v0.1.0" >&2
-}
-
-local version=${1:-}
-if [[ -z $version ]]; then
-  _usage "${0:t}"
-  exit 2
-fi
+# The file name carries no version, so that
+# https://github.com/alberti42/zsh-appearance-control/releases/latest/download/<name>
+# always serves the newest copy.
 
 if [[ $(command uname -s) != Darwin ]]; then
   print -r -- "${0:t}: macOS only (this artifact is a Darwin binary)" >&2
@@ -55,7 +48,10 @@ command mkdir -p -- "$out_dir"
 # Universal binary: one artifact for Apple Silicon and Intel.
 ( cd "$pkg_dir" && command swift build -c release --arch arm64 --arch x86_64 )
 
-local binary="$pkg_dir/.build/apple/Products/Release/zac-watch-macos"
+# Ask SwiftPM where it put the binary: the folder changed from .build/apple to
+# .build/out in Swift 6.4.
+local binary
+binary=$( cd "$pkg_dir" && command swift build -c release --arch arm64 --arch x86_64 --show-bin-path )/zac-watch-macos
 if [[ ! -x $binary ]]; then
   print -r -- "${0:t}: build produced no binary at $binary" >&2
   exit 1
@@ -78,7 +74,7 @@ for f in $plist $readme; do
   [[ -f $f ]] || { print -r -- "${0:t}: missing file: $f" >&2; exit 1 }
 done
 
-local package_dir="zac-watch-macos-${version}-macos-universal"
+local package_dir="zac-watch-macos-universal"
 local zip_path="$out_dir/${package_dir}.zip"
 
 local tmp

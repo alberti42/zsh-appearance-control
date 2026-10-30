@@ -12,17 +12,12 @@ setopt errexit nounset pipefail
 # - README + LICENSE
 #
 # Build tools in bin/ (make-release-zip, make-extras, changelog) are excluded.
+#
+# Produces dist/zsh-appearance-control.zip.
 
-function _usage() {
-  print -r -- "usage: $1 <version-tag>" >&2
-  print -r -- "example: $1 v0.1.0" >&2
-}
-
-local version=${1:-}
-if [[ -z $version ]]; then
-  _usage "${0:t}"
-  exit 2
-fi
+# The file name carries no version, so that
+# https://github.com/alberti42/zsh-appearance-control/releases/latest/download/<name>
+# always serves the newest copy.
 
 local repo_root
 repo_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
@@ -35,7 +30,7 @@ cd "$repo_root"
 local out_dir=dist
 command mkdir -p -- "$out_dir"
 
-local package_dir="zsh-appearance-control-${version}"
+local package_dir="zsh-appearance-control"
 local zip_path="$out_dir/${package_dir}.zip"
 
 local tmp

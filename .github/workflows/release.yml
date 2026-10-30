@@ -77,11 +77,7 @@ jobs:
           ZAC_CODESIGN_ID: ${{ steps.keychain.outputs.codesign_id }}
         run: |
           chmod +x bin/make-watcher
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            zsh -f bin/make-watcher "${{ inputs.tag }}"
-          else
-            zsh -f bin/make-watcher "${{ github.ref_name }}"
-          fi
+          zsh -f bin/make-watcher
 
       - name: Notarize
         if: steps.keychain.outputs.codesign_id != ''
@@ -90,7 +86,8 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
         run: |
           set -euo pipefail
-          BIN=watchers/macos/.build/apple/Products/Release/zac-watch-macos
+          # SwiftPM reports the folder; it changed from .build/apple to .build/out in Swift 6.4.
+          BIN=$(cd watchers/macos && swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/zac-watch-macos
 
           # notarytool takes a zip, a dmg or a pkg, never a bare executable.
           # This zip exists only to submit; what ships is the zip make-watcher
@@ -120,7 +117,8 @@ jobs:
       - name: Smoke test the packaged binary
         run: |
           set -euo pipefail
-          BIN=watchers/macos/.build/apple/Products/Release/zac-watch-macos
+          # SwiftPM reports the folder; it changed from .build/apple to .build/out in Swift 6.4.
+          BIN=$(cd watchers/macos && swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/zac-watch-macos
           lipo -archs "$BIN"
           codesign --verify --strict --verbose=2 "$BIN"
           "$BIN" --version
@@ -154,15 +152,10 @@ jobs:
       - name: Build release zip
         run: |
           chmod +x bin/make-release-zip bin/make-extras bin/make-watcher-linux
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-          zsh -f bin/make-release-zip "$TAG"
-          zsh -f bin/make-extras "$TAG"
+          zsh -f bin/make-release-zip
+          zsh -f bin/make-extras
           # The Linux watcher is a script: no compiler, no extra runner.
-          zsh -f bin/make-watcher-linux "$TAG"
+          zsh -f bin/make-watcher-linux
 
       - name: Download watcher artifact
         uses: actions/download-artifact@v8

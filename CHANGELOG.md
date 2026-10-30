@@ -46,6 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Release files have no version in their name:** `zsh-appearance-control.zip`,
+  `zac-watch-macos-universal.zip` and `zac-watch-linux.zip`, and the folder in
+  each zip likewise. A link to `releases/latest/download/<name>` therefore
+  always serves the newest copy. The build scripts no longer take a version
+  argument.
+- `make-watcher` and the release workflow ask SwiftPM where it put the watcher
+  binary (`--show-bin-path`): the folder changed from `.build/apple` to
+  `.build/out` in Swift 6.4, which broke the build there.
 - **A new shell starts with the current appearance.** The plugin reads the cache
   file when it loads and runs `ZAC_IMMEDIATE_CALLBACK_FNC` once; if that function
   is not defined yet, it runs before the first prompt or command instead.

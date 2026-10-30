@@ -41,8 +41,10 @@ jobs:
           set -euo pipefail
           # Without a tag, gh picks the latest release: not a draft, not a pre-release.
           TAG=$(gh release view --repo "$REPO" --json tagName -q .tagName)
+          # Matches zac-watch-macos-universal.zip, and the versioned name
+          # (zac-watch-macos-v2.2.1-macos-universal.zip) of older releases.
           gh release download "$TAG" --repo "$REPO" \
-            --pattern 'zac-watch-macos-*-macos-universal.zip'
+            --pattern 'zac-watch-macos-*universal.zip'
           shasum -a 256 zac-watch-macos-*.zip
           ditto -x -k zac-watch-macos-*.zip extracted
           BIN=$(find extracted -type f -name zac-watch-macos)
