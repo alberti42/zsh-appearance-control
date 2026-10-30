@@ -176,13 +176,16 @@ function test_gsettings_monitor_reacts_to_every_line() {
 
 function test_desktop_on_another_bus_is_reported() {
   # The watcher compares its bus with the one in the environment of the
-  # desktop process, read from /proc. A copy of `sleep` named gnome-shell
-  # stands in for the desktop.
+  # desktop process, read from /proc. A script named gnome-shell stands in for
+  # the desktop: for a script the kernel takes the process name from the file
+  # name. (A copy of `sleep` does not work where coreutils is one multicall
+  # binary, as on Ubuntu 26.04: it exits when called by an unknown name.)
   [[ -d /proc/self ]] || skip "needs /proc (Linux)"
   fake_desktop
   portal 1
   mkdir -p $T/desktop-bin
-  cp $(command -v sleep) $T/desktop-bin/gnome-shell
+  print -r -- $'#!/bin/sh\nsleep 30\nexit 0' > $T/desktop-bin/gnome-shell
+  chmod +x $T/desktop-bin/gnome-shell
   DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/the-desktop-bus spawn $T/desktop-bin/gnome-shell 30
   wait_for 'pgrep -x gnome-shell >/dev/null'
   start_watcher
