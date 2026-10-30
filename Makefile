@@ -200,5 +200,6 @@ endif
 		examples/tmux/catppuccin.conf \
 		$(WATCHER_DIR)/Sources/zac-watch-macos/main.swift \
 		$(WATCHER_LINUX_BIN)
-	@# Create local git tag
-	git tag v$(VERSION)
+	@# Create local git tag. With a message, so that it also works when git
+	@# signs tags (tag.gpgsign): a signed tag is annotated and needs one.
+	git tag -m "v$(VERSION)" v$(VERSION)
