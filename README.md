@@ -12,6 +12,8 @@
 
 `zsh-appearance-control` keeps your shells and terminal tools in step with the light/dark appearance of macOS or of your Linux desktop. Switch the system to dark mode, and every open zsh switches, together with tmux, Neovim, Emacs, and any tool whose config file you choose to rewrite.
 
+https://github.com/user-attachments/assets/0e6d7bc3-375d-4a3a-92e0-611c390048e0
+
 ## What happens when you switch appearance
 
 ```
