@@ -22,9 +22,11 @@
 #   in tmux and outside it.
 #
 # Entry points:
+# - Startup: _zac.init reads the file; the first precmd/preexec runs the
+#   immediate callback.
 # - Hook-driven refresh: precmd/preexec call _zac.sync when needs_sync=1.
-# - Signal-driven refresh: external tools (e.g. WezTerm) send USR1 -> needs_sync=1.
-# - User-driven change: `zac dark|light|toggle` sets OS dark mode (macOS).
+# - Signal-driven refresh: bin/appearance-dispatch sends USR1 -> needs_sync=1.
+# - User-driven change: `zac dark|light|toggle` sets OS dark mode (macOS, GNOME).
 
 # Prompt/plugin behavior only: do nothing in non-interactive shells.
 [[ -o interactive ]] || return 0

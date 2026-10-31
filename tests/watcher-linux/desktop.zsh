@@ -61,13 +61,15 @@ function test_gsettings_change_reaches_a_shell() {
     export ZAC_IMMEDIATE_CALLBACK_FNC=cb
     source $PLUGIN
     : > ready
-    repeat 200 { [[ $(<got) == *1 ]] && break; sleep 0.1 }
+    repeat 200 { [[ -e got && $(<got) == *1 ]] && break; sleep 0.1 }
   ' </dev/null >/dev/null 2>&1
   wait_for '[[ -e ready ]]'
 
   scheme prefer-dark
   wait_for '[[ $(<$T/log) == *"change: dispatched 1 (dark)"* ]]' 10
-  local want=$'0\n1'
+  # Only the value USR1 delivers: this shell never shows a prompt, so it never
+  # runs the hooks, and the startup call of the callback does not happen.
+  local want=1
   wait_for '[[ $(<got) == $want ]]'
   assert_content $ZAC_CACHE_DIR/appearance 1
   assert_content $T/io.calls $'0\n1'

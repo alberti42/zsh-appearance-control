@@ -25,7 +25,8 @@ zac toggle; zac status
 zac dark; zac status
 zac light; zac status
 EOF
-  assert_eq "$out" $'deferred 1\nos 0\ndeferred 0\n0\nos 1\ndeferred 1\n1\nos 0\ndeferred 0\n0'
+  # The deferred callback runs at the next prompt, after the command line.
+  assert_eq "$out" $'deferred 1\nos 0\n0\ndeferred 0\nos 1\n1\ndeferred 1\nos 0\n0\ndeferred 0'
 }
 
 function test_zac_reports_an_unsupported_platform() {

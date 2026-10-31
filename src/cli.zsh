@@ -1,8 +1,10 @@
 # User command entrypoint.
 #
 # The `zac` function is intentionally simple:
-# - `zac dark|light|toggle` sets macOS dark mode (async) and immediately updates
-#   the plugin's cached state + propagates prompt variables.
+# - `zac dark|light|toggle` asks the OS to switch (macOS, GNOME; async) and
+#   updates the cached state at once. The deferred callback runs at the next
+#   precmd: `zac` has an emulate line, and callbacks must run with the user's
+#   options, so it only sets needs_propagate.
 # - It does NOT perform a ground-truth query after setting (avoids prompt stalls).
 # - External changes should be communicated via USR1 (TRAPUSR1 sets needs_sync=1).
 # - `zac sync` forces a sync from the ground truth file.
@@ -42,13 +44,10 @@ function zac() {
     (sync)
       # Force a sync from ground truth.
       _zac.debug.log "cli | sync"
+      # When the value changed, _zac.sync sets needs_propagate, and the next
+      # precmd runs the deferred callback.
       _zac[state.needs_sync]=1
       _zac.sync
-      local rc=$?
-      if (( rc == 0 )) && (( _zac[state.needs_propagate] )); then
-        _zac.propagate
-      fi
-      return $rc
     ;;
 
     (debug)
@@ -77,9 +76,10 @@ function zac() {
         return 1
       fi
 
-      # Trust the transition; update cache and prompt immediately.
+      # Trust the transition: update the cache now, and let the next precmd
+      # run the deferred callback.
       _zac[state.is_dark]=$target
-      _zac.propagate
+      _zac[state.needs_propagate]=1
       # Do not schedule a sync here; external mechanism will send USR1.
       _zac[state.needs_sync]=0
       return 0

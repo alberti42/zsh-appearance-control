@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Both callbacks run with your shell's options.** `ZAC_DEFERRED_CALLBACK_FNC`
+  ran under zsh's default options plus `warn_create_global`, because the plugin
+  called it from a function that resets them; a plain global assignment in it
+  printed a warning. `ZAC_IMMEDIATE_CALLBACK_FNC` already ran with your options.
+  Start a callback with `emulate -L zsh` if it needs zsh's defaults.
+- When a shell starts, the immediate callback runs before the first prompt (or,
+  if the plugin loads after the first prompt, before the next command) instead
+  of during the plugin load, for the same reason.
+- `zac dark`, `zac light`, `zac toggle` and `zac sync` leave the deferred
+  callback to the next prompt instead of calling it themselves, for the same
+  reason. It still runs before the prompt is drawn.
+
 ## [2.3.0] - 2026-10-30
 
 ### Added

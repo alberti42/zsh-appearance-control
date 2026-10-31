@@ -15,12 +15,14 @@ function test_registered_shell_runs_its_callback() {
     export ZAC_IMMEDIATE_CALLBACK_FNC=cb
     source $PLUGIN
     : > ready
-    repeat 100 { [[ $(<got) == *1 ]] && break; sleep 0.1 }
+    repeat 100 { [[ -e got && $(<got) == *1 ]] && break; sleep 0.1 }
   ' </dev/null >/dev/null 2>&1
   wait_for '[[ -e ready ]]'
   run $DISPATCH dispatch 1
   assert_rc 0
-  local want=$'0\n1'
+  # Only the value USR1 delivers: this shell never shows a prompt, so it never
+  # runs the hooks, and the startup call of the callback does not happen.
+  local want=1
   wait_for '[[ $(<got) == $want ]]'
 }
 

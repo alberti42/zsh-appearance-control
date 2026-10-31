@@ -156,7 +156,7 @@ function _zac.init.state() {
   : ${_zac[state.needs_sync]:=0}
 
   # needs_immediate: 1 => run the immediate callback at the next precmd/preexec.
-  # Set at load when the callback function is not defined yet.
+  # Set by _zac.init when an immediate callback is configured.
   : ${_zac[state.needs_immediate]:=0}
 
   # needs_propagate: 1 => run _zac.propagate at the next safe opportunity.
@@ -286,7 +286,7 @@ function _zac.init.shell() {
   (( ${+_zac[guard.shell_inited]} )) && return 0
   _zac[guard.shell_inited]=1
 
-  # The load-time sync happens in _zac.init.apply, after init.
+  # _zac.init reads the ground truth file at its end.
   _zac[state.needs_propagate]=0
 
   # Defer propagation until the next prompt after plugin load.
@@ -304,9 +304,13 @@ function _zac.init() {
   # - Initialize debug (if enabled)
   # - Initialize runtime flags (defer_propagate, etc.)
   # - Register zsh integration points (hooks + TRAPUSR1)
+  # - Read the ground truth file once, so a new shell starts with the current
+  #   value (a builtin read, no fork)
   #
   # Non-responsibilities:
-  # - No external queries (tmux/OS) and no sync: see _zac.init.apply.
+  # - No OS query.
+  # - No callback call. Callbacks run only from the hooks and from TRAPUSR1,
+  #   which have no emulate line, so they see the user's options.
   builtin emulate -LR zsh -o warn_create_global -o no_short_loops
 
   # These are special global hook arrays in zsh.
@@ -382,6 +386,14 @@ function _zac.init() {
   # The plugin only flips state.needs_sync in TRAPUSR1, and the next prompt/Enter
   # will sync+propagate normally.
 
+  # A new shell starts with the current value.
+  _zac.sync
+
+  # Run the immediate callback at the first precmd/preexec, not here: called
+  # from this function, it would run under the emulate options above instead of
+  # the user's.
+  [[ -n ${_zac[cfg.immediate_callback_fnc]} ]] && _zac[state.needs_immediate]=1
+
   _zac.debug.log "init | done"
 }
 
@@ -389,20 +401,20 @@ function _zac.init() {
 function _zac.propagate() {
   # Apply cached state to prompt-related variables.
   #
-  # This function must be fast and side-effect-safe because it can be called
-  # from hooks. It does not query tmux/OS.
-  builtin emulate -LR zsh -o warn_create_global -o no_short_loops
-
+  # This function must be fast because it is called from the hooks. It does not
+  # query the OS.
+  #
+  # No emulate: it calls the deferred callback, which must run with the user's
+  # options. Call it only from the hooks, never from a function that has an
+  # emulate line.
   (( _zac[state.defer_propagate] )) && return
   _zac[state.needs_propagate]=0
 
   _zac.debug.log "core | propagate | is_dark=${_zac[state.is_dark]:-}"
 
   local cb=${_zac[cfg.deferred_callback_fnc]}
-  if [[ -n $cb && $+functions[$cb] -eq 1 ]]; then
-    local is_dark=${_zac[state.is_dark]:-0}
-     
-    $cb $is_dark
+  if [[ -n $cb ]] && (( $+functions[$cb] )); then
+    $cb ${_zac[state.is_dark]:-0}
   fi
 }
 
@@ -435,35 +447,24 @@ function _zac.sync() {
 }
 
 function _zac.immediate() {
-  # Run the immediate callback with the cached state.
+  # Run the immediate callback with the cached state, once, for a new shell.
+  # (On USR1, TRAPUSR1 calls the callback itself.)
   #
-  # No emulate: the callback must run with the user's options.
-  # Returns 1 when a callback is configured but its function is not defined.
+  # No emulate: the callback must run with the user's options. Call it only
+  # from the hooks.
   local cb=${_zac[cfg.immediate_callback_fnc]:-}
-  [[ -n $cb ]] || return 0
-  (( $+functions[$cb] )) || return 1
-  $cb ${_zac[state.is_dark]:-0}
+  [[ -n $cb ]] && (( $+functions[$cb] )) && $cb ${_zac[state.is_dark]:-0}
   return 0
-}
-
-function _zac.init.apply() {
-  # Apply the current appearance to a new shell, once, at load.
-  #
-  # Reading the cache file is a builtin read with no fork, so it is cheap
-  # enough for startup. It runs outside _zac.init so that the callback sees
-  # the user's options, not the emulate options of init.
-  #
-  # The callback function may be defined later in .zshrc than the plugin is
-  # loaded; then it runs at the first precmd/preexec instead.
-  _zac.sync
-  _zac.immediate || _zac[state.needs_immediate]=1
 }
 
 function _zac.precmd() {
   # precmd hook: runs right before the prompt is shown.
   # Used to perform deferred sync work and to perform one-time propagation
   # after the initial defer window.
+
+  # The immediate callback is due since _zac.init: run it once.
   if (( _zac[state.needs_immediate] )); then
+    _zac.debug.log "core | precmd | immediate callback"
     _zac[state.needs_immediate]=0
     _zac.immediate
   fi
@@ -491,7 +492,11 @@ function _zac.preexec() {
   # preexec hook: runs after Enter, right before executing the command.
   # This helps keep state correct even if a signal arrived while the user was
   # sitting at a prompt (no precmd ran yet).
+
+  # The immediate callback is due since _zac.init: run it once. This is the
+  # first chance when zinit turbo loads the plugin after the first prompt.
   if (( _zac[state.needs_immediate] )); then
+    _zac.debug.log "core | preexec | immediate callback"
     _zac[state.needs_immediate]=0
     _zac.immediate
   fi
@@ -508,4 +513,3 @@ function _zac.preexec() {
 
 # Self-init when sourced.
 _zac.init
-_zac.init.apply

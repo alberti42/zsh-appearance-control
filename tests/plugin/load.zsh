@@ -23,7 +23,9 @@ EOF
   assert_eq "$out" $'0\nrc=1'
 }
 
-function test_immediate_callback_runs_once_at_load() {
+function test_immediate_callback_runs_once_before_first_prompt() {
+  # Not during the load: called from _zac.init it would run under the
+  # plugin's emulate options instead of the user's.
   set_appearance 1
   zsh_session <<'EOF'
 cb() { print -r -- "cb $1" }
@@ -31,7 +33,7 @@ export ZAC_IMMEDIATE_CALLBACK_FNC=cb
 source $PLUGIN; print -r -- loaded
 print -r -- next
 EOF
-  assert_eq "$out" $'cb 1\nloaded\nnext'
+  assert_eq "$out" $'loaded\ncb 1\nnext'
 }
 
 function test_immediate_callback_defined_after_load_runs_before_first_prompt() {

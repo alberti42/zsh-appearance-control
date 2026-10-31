@@ -103,7 +103,7 @@ source "/path/to/zsh-appearance-control/zsh-appearance-control.plugin.zsh"
 
 ### What happens when a shell starts
 
-When the plugin loads, it reads the cache file and runs `ZAC_IMMEDIATE_CALLBACK_FNC`, so a new shell starts with the current appearance. If the callback function is not defined yet at that point (because `.zshrc` defines it after loading the plugin), it runs before the first prompt or command instead. `ZAC_DEFERRED_CALLBACK_FNC` runs at the first prompt.
+When the plugin loads, it reads the cache file. Before the first prompt, it runs `ZAC_IMMEDIATE_CALLBACK_FNC` and then `ZAC_DEFERRED_CALLBACK_FNC`, so a new shell starts with the current appearance. If the plugin loads after the first prompt (zinit `wait`), the immediate callback runs before your next command.
 
 ## Choose a watcher
 
@@ -247,6 +247,8 @@ There are three places to hook in. The right one depends on what you are trying 
 Programs that watch files, such as Neovim and Emacs, need none of these: they watch the cache file.
 
 ### Shell settings: the callbacks
+
+Both callbacks run with your shell's options, like any function in your `.zshrc`. If a callback needs zsh's default options, start it with `emulate -L zsh`.
 
 **`ZAC_IMMEDIATE_CALLBACK_FNC`** is a shell function called directly inside the signal handler in every shell, before the next prompt redraws. It receives `1` for dark and `0` for light.
 
