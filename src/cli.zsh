@@ -5,7 +5,7 @@
 #   the plugin's cached state + propagates prompt variables.
 # - It does NOT perform a ground-truth query after setting (avoids prompt stalls).
 # - External changes should be communicated via USR1 (TRAPUSR1 sets needs_sync=1).
-# - `zac sync` forces a sync from ground truth (tmux @dark_appearance for now).
+# - `zac sync` forces a sync from the ground truth file.
 
 function zac() {
   # CLI dispatcher.

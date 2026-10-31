@@ -7,7 +7,7 @@
 #
 # This file is also self-contained:
 # - it knows how to compile+source other modules in this plugin
-# - it sources its hard dependencies (tmux + ground truth)
+# - it sources its hard dependency (the ground truth reader)
 # - it self-initializes by calling _zac.init once at EOF
 #
 ####################################################################
@@ -138,7 +138,7 @@ function _zac.init.config() {
   esac
   : ${_zac[cfg.linux_desktop]:=$linux_desktop}
 
-  # cache.dir: base directory for non-tmux ground truth and pid registry.
+  # cache.dir: base directory for the ground truth file and the pid registry.
   # Defaults to XDG cache dir when available.
   local cache_base
   cache_base=${ZAC_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/zac}

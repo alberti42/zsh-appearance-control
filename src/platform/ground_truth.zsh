@@ -7,8 +7,8 @@
 # safe on the prompt path.
 #
 # tmux is never used to carry the appearance. It is only a *consumer*: the
-# dispatcher writes the option @dark_appearance so the tmux status bar theme can
-# restyle itself. Remote hosts get the file too, because ssh-tmux writes it at
+# user's ZAC_IO_CMD script sets the option @dark_appearance, if the user themes
+# tmux; nothing in this repository does. Remote hosts get the file too, because ssh-tmux writes it at
 # connect time (see src/ssh-tmux.zsh and docs/design-tmux-independence.md).
 function _zac.dark_mode.query_ground_truth() {
   # Sets REPLY to 1 (dark), 0 (light), or '' (unknown, return status 1).
