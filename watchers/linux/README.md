@@ -330,3 +330,36 @@ D-Bus activated and reachable as soon as the session is up:
 ```ini
 Environment=ZAC_WATCH_BACKEND=portal
 ```
+
+## An app stays light in dark mode
+
+The watcher reads the colour scheme and changes nothing on the desktop. An app
+that ignores the colour scheme does not follow it. Sublime Merge is one: on
+GNOME it decides light or dark from the GTK3 theme name
+(`org.gnome.desktop.interface gtk-theme`), and GNOME's dark mode does not change
+that name.
+
+The theme name is a choice that belongs in your io script
+([`ZAC_IO_CMD`](../../README.md#config-files-the-io-script)). Set it there, and
+skip the step outside GNOME:
+
+```zsh
+if [[ $OSTYPE == linux* && :${(L)XDG_CURRENT_DESKTOP}: == *:gnome:* ]] \
+   && (( $+commands[gsettings] )); then
+  if (( is_dark )); then gtk_theme=Adwaita-dark; else gtk_theme=Adwaita; fi
+  gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme" || exit 1
+fi
+```
+
+`XDG_CURRENT_DESKTOP` is a colon-separated list (Ubuntu sets `ubuntu:GNOME`),
+hence the colons in the pattern. The watcher service has this variable when it
+runs in the graphical session.
+
+Some distributions (Fedora, for one) ship no GTK3 theme called `Adwaita-dark`.
+GTK3 apps then keep drawing light Adwaita, but Sublime Merge still switches to
+dark: it picks dark for any name that ends in `-dark` (`Foo-dark` gives dark,
+`Foo` gives light), whether or not the theme is installed.
+
+Changing `gtk-theme` also emits a settings signal, so the log may show
+`change: already dark, skipped`. That is the case described under
+[Debugging](#debugging).

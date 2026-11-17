@@ -303,6 +303,7 @@ exit 0
 - It must be a single executable path. If you need to pass arguments or set environment variables, write a small wrapper script.
 - Use `#!/bin/zsh` (without `-f`) as the shebang so that your `.zshenv` is sourced and your usual `PATH` and variables are available.
 - **A non-zero exit aborts the whole dispatch**: the cache file is not written and no shell is signaled. Make each step skip a tool that is not installed on this host rather than fail.
+- Some apps ignore the desktop's colour scheme and read another setting, such as the GTK3 theme name on GNOME. Set that setting from the io script; the [Linux watcher manual](watchers/linux/README.md#an-app-stays-light-in-dark-mode) has an example.
 
 ### tmux
 
